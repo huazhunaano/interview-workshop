@@ -187,6 +187,24 @@ class RetrievalServiceTest {
                 "结果只应来自挂载的那一篇：" + mounted);
     }
 
+    /** 6b. 解绑一本书后，该书条目立即不再命中（范围每次按当前挂载计算，不缓存）。 */
+    @Test
+    void 解绑一本书后该书条目立即不再命中() {
+        knowledgeService.setDocCodesOf(ROLE, List.of(JVM_DOC, DB_DOC));
+
+        List<KnowledgeHit> before = retrievalService.search("垃圾回收器", ROLE, "java",
+                RetrievalService.SearchOptions.defaults(), RetrievalService.RetrievalMode.HYBRID);
+        assertFalse(before.isEmpty(), "两本都绑定时应能命中 JVM 那本");
+        assertTrue(before.stream().allMatch(hit -> JVM_DOC.equals(hit.docCode())),
+                "命中结果只应来自 JVM 文档：" + before);
+
+        // 只解绑 JVM 那本，保留 DB；同一句查询必须立刻落空
+        knowledgeService.setDocCodesOf(ROLE, List.of(DB_DOC));
+        assertTrue(retrievalService.search("垃圾回收器", ROLE, "java",
+                        RetrievalService.SearchOptions.defaults(), RetrievalService.RetrievalMode.HYBRID).isEmpty(),
+                "解绑后 JVM 文档仍被检索到，说明挂载范围没有立即生效");
+    }
+
     /** 7. 版本失效：先查一次把索引缓存住，写入新片段后必须能立刻检索到。 */
     @Test
     void 写入新片段后缓存立即失效() {
