@@ -131,7 +131,9 @@
                 :key="hit.chunkId"
                 class="rounded-lg border border-white/10 bg-black/20 p-2"
               >
-                <p class="text-[11px] text-white/40">{{ hit.docCode }} · {{ hit.docTitle }}</p>
+                <p class="text-[11px] text-white/40">
+                  {{ hit.docCode }} · {{ hit.docTitle }} · chunk#{{ hit.chunkIndex }}
+                </p>
                 <p class="text-sm text-white/85">{{ hit.heading }}</p>
                 <p class="line-clamp-2 text-xs leading-relaxed text-white/50">{{ hit.text }}</p>
                 <p class="text-[11px] text-white/35">
@@ -147,8 +149,49 @@
               没有命中（低于阈值就不注入）。
             </p>
 
+            <!-- 切块预览：直接看到入库后每个片段的位置与内容 -->
+            <div class="mt-4 border-t border-white/10 pt-3">
+              <div class="flex flex-wrap items-center gap-2">
+                <h5 class="text-xs font-semibold text-white/70">切块预览</h5>
+                <span class="text-[11px] text-white/40">看某篇文档被切成了哪些片段</span>
+                <select
+                  v-model="previewCode"
+                  class="glass-input ml-auto w-56 text-xs"
+                  aria-label="选择要预览切块的文档"
+                >
+                  <option value="">选择文档</option>
+                  <option v-for="doc in knowledgeDocs" :key="doc.code" :value="doc.code">
+                    {{ doc.title }}（{{ doc.chunkCount }} 段）
+                  </option>
+                </select>
+                <button
+                  class="btn-sm shrink-0"
+                  :disabled="!previewCode || previewLoading"
+                  @click="loadChunkPreview"
+                >
+                  {{ previewLoading ? "读取中…" : "查看切块" }}
+                </button>
+              </div>
+
+              <div v-if="previewChunks.length > 0" class="mt-2 max-h-72 space-y-2 overflow-y-auto">
+                <div
+                  v-for="chunk in previewChunks"
+                  :key="chunk.chunkIndex"
+                  class="rounded-lg border border-white/10 bg-black/20 p-2"
+                >
+                  <p class="text-[11px] text-white/40">
+                    chunk#{{ chunk.chunkIndex }} · {{ chunk.charCount }} 字
+                  </p>
+                  <p class="text-xs text-white/80">{{ chunk.heading }}</p>
+                  <p class="line-clamp-3 text-[11px] leading-relaxed text-white/50">
+                    {{ chunk.text }}
+                  </p>
+                </div>
+              </div>
+            </div>
+
             <p class="mt-3 text-xs text-white/40">
-              解绑在「角色卡 → 知识库挂载」里操作；解绑后回到本页点「刷新绑定」再检索，该书条目会立即消失。
+              绑定/解绑在「角色卡 → 岗位知识」的多选下拉里操作；解绑后回到本页点「刷新绑定」再检索，该书条目会立即消失。
             </p>
           </div>
 
@@ -602,7 +645,11 @@ import {
 } from "../../../data/mock";
 import {
   getRoleKnowledge,
+  listDocChunks,
+  listKnowledgeDocs,
   searchKnowledge,
+  type KnowledgeChunkView,
+  type KnowledgeDocView,
   type KnowledgeHit,
 } from "../../../api/knowledge";
 
@@ -666,6 +713,12 @@ const knowledgeScope = ref<number | null>(null);
 const knowledgeLoading = ref(false);
 const knowledgeError = ref("");
 const knowledgeSearched = ref(false);
+
+/** 切块预览（全部文档，不限于当前角色绑定） */
+const knowledgeDocs = ref<KnowledgeDocView[]>([]);
+const previewCode = ref("");
+const previewChunks = ref<KnowledgeChunkView[]>([]);
+const previewLoading = ref(false);
 
 const showStore = ref(true);
 const showInjected = ref(false);
@@ -956,9 +1009,10 @@ async function loadRoleBindings(): Promise<void> {
 
 async function loadKnowledgeRoles(): Promise<void> {
   try {
-    knowledgeRoles.value = await fetchKnowledgeRoles();
-    const preferred =
-      knowledgeRoles.value.find((role) => role.code === "strict") ?? knowledgeRoles.value[0];
+    const [roles, docs] = await Promise.all([fetchKnowledgeRoles(), listKnowledgeDocs()]);
+    knowledgeRoles.value = roles;
+    knowledgeDocs.value = docs;
+    const preferred = roles.find((role) => role.code === "strict") ?? roles[0];
     if (preferred) {
       knowledgeRoleCode.value = preferred.code;
       await loadRoleBindings();
@@ -1006,12 +1060,30 @@ async function runKnowledgeSearch(): Promise<void> {
 async function refreshKnowledge(): Promise<void> {
   knowledgeError.value = "";
   try {
-    await loadRoleBindings();
+    // 文档也可能刚在角色页新增，一并刷新，切块预览的下拉才能看到新文档
+    const [docs] = await Promise.all([listKnowledgeDocs(), loadRoleBindings()]);
+    knowledgeDocs.value = docs;
   } catch (e) {
     knowledgeError.value = e instanceof Error ? e.message : String(e);
     return;
   }
   if (knowledgeQuery.value.trim()) await runKnowledgeSearch();
+}
+
+/** 读取某篇文档的切块：位置 + 内容，对应后端日志里的 chunk# */
+async function loadChunkPreview(): Promise<void> {
+  const code = previewCode.value;
+  if (!code || previewLoading.value) return;
+  previewLoading.value = true;
+  knowledgeError.value = "";
+  try {
+    previewChunks.value = await listDocChunks(code);
+  } catch (e) {
+    previewChunks.value = [];
+    knowledgeError.value = e instanceof Error ? e.message : String(e);
+  } finally {
+    previewLoading.value = false;
+  }
 }
 
 const loadSnapshot = (roleId: number) => {
