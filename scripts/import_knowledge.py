@@ -13,10 +13,10 @@
 
 用法：
     python scripts/import_knowledge.py --dry-run          # 只看切分结果，不写库
-    python scripts/import_knowledge.py                     # 全量导入，并默认挂初始绑定
+    python scripts/import_knowledge.py                     # 全量导入，不自动绑定任何角色
     python scripts/import_knowledge.py --force             # 忽略指纹强制重传
     python scripts/import_knowledge.py --role strict,expert  # 导入后挂到角色卡
-    python scripts/import_knowledge.py --no-seed-bindings  # 不自动挂初始知识库
+    python scripts/import_knowledge.py --seed-bindings     # 额外挂演示用初始绑定（默认关）
     python scripts/import_knowledge.py --selftest          # 只跑切分逻辑断言，不需要后端
 """
 
@@ -42,8 +42,9 @@ DEFAULT_DIR = ROOT / "data" / "knowledge"
 INDEX_FILE = DEFAULT_DIR / ".knowledge-index.json"
 DEFAULT_API = "http://127.0.0.1:8080"
 
-# 角色卡初始绑定（issue #3）：strict=风雪 两本，pressure=松子 一本。
-# 只在角色「当前没有任何绑定」时写入，已有绑定一律不动 —— 否则用户解绑后重跑导入会被悄悄挂回去。
+# 演示用初始绑定（默认不写入）：知识库导入后角色保持「未绑定」，由前端角色卡里的
+# 多选下拉框显式挂载。只有显式传 --seed-bindings 时才写，且只在角色「当前没有任何绑定」时写入，
+# 已有绑定一律不动 —— 否则用户解绑后重跑导入会被悄悄挂回去。
 SEED_BINDINGS = {
     "strict": ["java-spring-core", "java-jvm-memory"],
     "pressure": ["java-mysql-index"],
@@ -289,8 +290,8 @@ def main():
     ap.add_argument("--dir", default=str(DEFAULT_DIR))
     ap.add_argument("--api", default=os.environ.get("KNOWLEDGE_API", DEFAULT_API))
     ap.add_argument("--role", default="", help="导入后挂到这些角色卡（逗号分隔）")
-    ap.add_argument("--seed-bindings", action=argparse.BooleanOptionalAction, default=True,
-                    help="自动给风雪(strict) 挂两本、松子(pressure) 挂一本（默认开；已有绑定不覆盖）")
+    ap.add_argument("--seed-bindings", action=argparse.BooleanOptionalAction, default=False,
+                    help="额外挂演示用初始绑定（默认关；已有绑定不覆盖）")
     ap.add_argument("--force", action="store_true", help="忽略指纹，强制重传")
     ap.add_argument("--dry-run", action="store_true", help="只打印切分结果，不写库")
     ap.add_argument("--selftest", action="store_true", help="只跑切分自测")

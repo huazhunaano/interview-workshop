@@ -6,6 +6,7 @@ import cn.edu.zjut.interview.domain.KnowledgeDoc;
 import cn.edu.zjut.interview.domain.KnowledgeVector;
 import cn.edu.zjut.interview.dto.ChunkCommand;
 import cn.edu.zjut.interview.dto.CreateDocCommand;
+import cn.edu.zjut.interview.dto.KnowledgeChunkView;
 import cn.edu.zjut.interview.dto.KnowledgeDocView;
 import cn.edu.zjut.interview.knowledge.EmbeddingProvider;
 import cn.edu.zjut.interview.knowledge.KnowledgeIndexVersion;
@@ -231,6 +232,34 @@ public class KnowledgeService {
     @Transactional
     public ChunkSyncResult importMarkdown(String docCode, String title, String category,
                                           String sourcePath, String markdown) {
+        upsertDoc(docCode, title, category, sourcePath);
+        return syncChunks(docCode, commandsOf(MarkdownChunker.chunk(markdown)));
+    }
+
+    /**
+     * 前端上传纯文本（.txt）：切分规则退化成「按空行分段、超长再合段」，
+     * 与 markdown 的标题切分共用同一套 {@code syncChunks} 增量同步。
+     *
+     * <p>纯文本没有 {@code #}/{@code ##}，硬套 markdown 切分只会得到「整篇一个片段」，
+     * 一份几千字的 txt 就永远只能整段命中、整段注入。
+     */
+    @Transactional
+    public ChunkSyncResult importText(String docCode, String title, String category,
+                                      String sourcePath, String text) {
+        upsertDoc(docCode, title, category, sourcePath);
+        return syncChunks(docCode, commandsOf(MarkdownChunker.chunkPlainText(text)));
+    }
+
+    private static List<ChunkCommand> commandsOf(List<MarkdownChunker.Chunk> chunks) {
+        List<ChunkCommand> commands = new ArrayList<>(chunks.size());
+        for (MarkdownChunker.Chunk chunk : chunks) {
+            commands.add(new ChunkCommand(chunk.heading(), chunk.text()));
+        }
+        return commands;
+    }
+
+    /** 建或更新文档元信息；只覆盖传了值的字段，前端改标题不该把分类清空。 */
+    private KnowledgeDoc upsertDoc(String docCode, String title, String category, String sourcePath) {
         if (docCode == null || docCode.isBlank()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "文档 code 不能为空");
         }
@@ -249,24 +278,30 @@ public class KnowledgeService {
             doc.setCreatedAt(now);
             doc.setUpdatedAt(now);
             docRepository.save(doc);
-        } else {
-            // 只更新传了值的字段：前端改标题不该把分类清空
-            if (title != null && !title.isBlank()) {
-                doc.setTitle(title);
-            }
-            if (category != null && !category.isBlank()) {
-                doc.setCategory(category);
-            }
-            if (sourcePath != null && !sourcePath.isBlank()) {
-                doc.setSourcePath(sourcePath);
-            }
+            return doc;
         }
+        if (title != null && !title.isBlank()) {
+            doc.setTitle(title);
+        }
+        if (category != null && !category.isBlank()) {
+            doc.setCategory(category);
+        }
+        if (sourcePath != null && !sourcePath.isBlank()) {
+            doc.setSourcePath(sourcePath);
+        }
+        return doc;
+    }
 
-        List<ChunkCommand> commands = new ArrayList<>();
-        for (MarkdownChunker.Chunk chunk : MarkdownChunker.chunk(markdown)) {
-            commands.add(new ChunkCommand(chunk.heading(), chunk.text()));
+    /** 文档的切块列表（位置 + 内容），前端「切块预览」与演示用。 */
+    @Transactional(readOnly = true)
+    public List<KnowledgeChunkView> listChunks(String docCode) {
+        KnowledgeDoc doc = requireDoc(docCode);
+        List<KnowledgeChunk> chunks = chunkRepository.findByDocIdOrderByChunkIndexAsc(doc.getId());
+        List<KnowledgeChunkView> views = new ArrayList<>(chunks.size());
+        for (KnowledgeChunk chunk : chunks) {
+            views.add(KnowledgeChunkView.of(chunk));
         }
-        return syncChunks(docCode, commands);
+        return views;
     }
 
     private static String headingOf(ChunkCommand cmd) {

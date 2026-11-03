@@ -196,6 +196,8 @@ public class RetrievalService {
         RetrievalIndex index = currentIndex();
         List<Integer> scope = scopePositions(index, interviewerCode, jobCode);
         if (scope.isEmpty()) {
+            log.info("[Knowledge] 检索 query=\"{}\" interviewer={} job={} 范围为空（角色未绑定文档或文档被停用）",
+                    query, blankToDash(interviewerCode), blankToDash(jobCode));
             return List.of();
         }
 
@@ -240,9 +242,48 @@ public class RetrievalService {
             Candidate candidate = passed.get(i);
             RetrievalIndex.Doc doc = docs.get(candidate.position);
             hits.add(new KnowledgeHit(doc.chunkId(), doc.docId(), doc.docCode(), doc.docTitle(),
-                    doc.heading(), doc.text(), candidate.rrf, candidate.vectorScore, candidate.bm25Score));
+                    doc.chunkIndex(), doc.heading(), doc.text(),
+                    candidate.rrf, candidate.vectorScore, candidate.bm25Score));
         }
+        logHits(query, interviewerCode, jobCode, effective, scope.size(), hits);
         return hits;
+    }
+
+    /**
+     * 把这次命中写进日志：文档、片段序号、标题与正文前 160 字。
+     *
+     * <p>演示/排障时最常见的疑问是「答案是照着哪一段说的」，只给分数看不出位置；
+     * {@code chunkIndex} + {@code heading} 就能回到源文档定位，正文摘要足够核对内容。
+     */
+    private static void logHits(String query, String interviewerCode, String jobCode,
+                                RetrievalMode mode, int scopeSize, List<KnowledgeHit> hits) {
+        if (!log.isInfoEnabled()) {
+            return;
+        }
+        log.info("[Knowledge] 检索 query=\"{}\" interviewer={} job={} mode={} scope={} hits={}",
+                query, blankToDash(interviewerCode), blankToDash(jobCode), mode.wireName(),
+                scopeSize, hits.size());
+        for (int i = 0; i < hits.size(); i++) {
+            KnowledgeHit hit = hits.get(i);
+            log.info("[Knowledge]   #{} doc={} chunk#{} heading=\"{}\" rrf={} text=\"{}\"",
+                    i + 1, hit.docCode(), hit.chunkIndex(),
+                    hit.heading() == null ? "" : hit.heading(),
+                    String.format("%.4f", hit.score()),
+                    snippet(hit.text(), 160));
+        }
+    }
+
+    private static String blankToDash(String value) {
+        return value == null || value.isBlank() ? "-" : value;
+    }
+
+    /** 正文摘要：换行压成空格，超长加省略号，保证一条日志只占一行。 */
+    private static String snippet(String text, int limit) {
+        if (text == null) {
+            return "";
+        }
+        String flat = text.replaceAll("\\s+", " ").strip();
+        return flat.length() <= limit ? flat : flat.substring(0, limit) + "…";
     }
 
     /** 范围内片段数：前端「试搜」据此判断是不是根本没挂语料。 */
@@ -314,6 +355,7 @@ public class RetrievalService {
                 continue;
             }
             docs.add(new RetrievalIndex.Doc(chunk.getId(), doc.getId(), doc.getCode(), doc.getTitle(),
+                    chunk.getChunkIndex() == null ? -1 : chunk.getChunkIndex(),
                     chunk.getHeading(), chunk.getText(), chunk.getHypeQuestions()));
         }
 
