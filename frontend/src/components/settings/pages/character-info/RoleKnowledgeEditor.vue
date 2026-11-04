@@ -1,5 +1,5 @@
 <template>
-  <div ref="rootRef" class="space-y-3 rounded-xl border border-white/10 bg-black/20 p-4">
+  <div class="space-y-3 rounded-xl border border-white/10 bg-black/20 p-4">
     <div class="flex items-start justify-between gap-3">
       <div class="min-w-0">
         <h3 class="text-sm font-bold text-white/80">岗位知识</h3>
@@ -15,57 +15,15 @@
     <div v-if="loading" class="text-xs text-white/40">加载中...</div>
 
     <template v-else>
-      <!-- 多选下拉：收起时只显示已选数量，展开后按分类列出全部文档 -->
-      <div class="relative">
-        <button
-          type="button"
-          class="flex w-full cursor-pointer items-center justify-between gap-2 rounded-xl border border-white/10 bg-black/20 px-3.5 py-2.5 text-left text-sm text-white/80 transition-colors hover:bg-white/5"
-          :aria-expanded="open"
-          @click="open = !open"
-        >
-          <span class="min-w-0 truncate">
-            <span v-if="selectedDocs.length === 0" class="text-white/40">未绑定任何知识库</span>
-            <span v-else>已绑定 {{ selectedDocs.length }} 本：{{ selectedDocs.map((d) => d.title).join("、") }}</span>
-          </span>
-          <ChevronDown
-            :size="16"
-            class="shrink-0 text-white/40 transition-transform"
-            :class="{ 'rotate-180': open }"
-          />
-        </button>
-
-        <div
-          v-if="open"
-          class="absolute inset-x-0 z-30 mt-1 rounded-xl border border-white/15 bg-[#1c1c24]/95 p-2 shadow-[0_18px_40px_rgba(0,0,0,0.45)] backdrop-blur"
-        >
-          <input v-model="docFilter" class="glass-input mb-2 text-xs" placeholder="搜索标题或编码" />
-
-          <div v-if="docs.length > 0" class="max-h-56 space-y-1 overflow-y-auto">
-            <label
-              v-for="doc in filteredDocs"
-              :key="doc.code"
-              class="flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 text-sm text-white/80 hover:bg-white/5"
-            >
-              <input v-model="checked" type="checkbox" :value="doc.code" class="shrink-0 cursor-pointer" />
-              <span class="min-w-0 flex-1 truncate">{{ doc.title }}</span>
-              <span class="shrink-0 text-[11px] text-white/35">{{ doc.chunkCount }} 段</span>
-            </label>
-            <p v-if="filteredDocs.length === 0" class="px-2 py-1 text-xs text-white/40">
-              没有匹配的文档
-            </p>
-          </div>
-          <p v-else class="px-2 py-1 text-xs text-white/40">
-            还没有导入任何文档，用下方「新增知识库」添加。
-          </p>
-
-          <div class="mt-2 flex items-center justify-between border-t border-white/10 pt-2">
-            <button type="button" class="cursor-pointer text-[11px] text-white/45 hover:text-white/80" @click="checked = []">
-              清空选择
-            </button>
-            <span class="text-[11px] text-white/40">已选 {{ checked.length }} 本</span>
-          </div>
-        </div>
-      </div>
+      <!-- 多选下拉：复用 ui/LcMultiSelect（与 RoleExportMenu 同一套弹层观感） -->
+      <LcMultiSelect
+        ref="pickerRef"
+        v-model="checked"
+        :options="docOptions"
+        :summary="summary"
+        search-placeholder="搜索标题或编码"
+        :empty-text="docs.length === 0 ? '还没有导入任何文档，用下方「新增知识库」添加' : '没有匹配的文档'"
+      />
 
       <!-- 已选文档的标签，方便确认当前挂载 -->
       <div v-if="selectedDocs.length > 0" class="flex flex-wrap gap-1.5">
@@ -137,8 +95,9 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, reactive, ref, watch } from "vue";
+import { computed, reactive, ref, watch } from "vue";
 import { ChevronDown, Plus } from "@lucide/vue";
+import LcMultiSelect from "../../../ui/LcMultiSelect.vue";
 import {
   getRoleKnowledge,
   listKnowledgeDocs,
@@ -160,30 +119,27 @@ const checked = ref<string[]>([]);
 const loading = ref(false);
 const saving = ref(false);
 
-/** 下拉框展开状态与筛选词 */
-const open = ref(false);
-const docFilter = ref("");
-const rootRef = ref<HTMLElement | null>(null);
+/** 多选下拉的实例：新增文档后用它展开面板，让新条目立刻可见 */
+const pickerRef = ref<InstanceType<typeof LcMultiSelect> | null>(null);
 
 const selectedDocs = computed(() => docs.value.filter((doc) => checked.value.includes(doc.code)));
 
-const filteredDocs = computed(() => {
-  const keyword = docFilter.value.trim().toLowerCase();
-  if (!keyword) return docs.value;
-  return docs.value.filter(
-    (doc) =>
-      doc.title.toLowerCase().includes(keyword) || doc.code.toLowerCase().includes(keyword),
-  );
-});
+/** 下拉选项：标题 + 片段数提示，编码用于检索范围 */
+const docOptions = computed(() =>
+  docs.value.map((doc) => ({
+    value: doc.code,
+    label: doc.title,
+    hint: `${doc.chunkCount} 段`,
+  })),
+);
 
-// 点空白处收起下拉，避免遮挡下面的表单
-const onDocumentClick = (event: MouseEvent) => {
-  if (open.value && !rootRef.value?.contains(event.target as Node)) {
-    open.value = false;
+/** 触发器文案：未绑定时给出下一步提示，绑定时列出书名 */
+const summary = computed(() => {
+  if (selectedDocs.value.length === 0) {
+    return "未绑定任何知识库";
   }
-};
-onMounted(() => document.addEventListener("click", onDocumentClick));
-onUnmounted(() => document.removeEventListener("click", onDocumentClick));
+  return `已绑定 ${selectedDocs.value.length} 本：${selectedDocs.value.map((doc) => doc.title).join("、")}`;
+});
 
 // 换角色时旧请求可能后返回，用序号丢弃过期结果（同 RelationEditor 的写法）
 let loadSeq = 0;
@@ -216,7 +172,7 @@ const save = async () => {
   try {
     await saveRoleKnowledge(props.interviewerCode, checked.value);
     notify("已保存岗位知识");
-    open.value = false;
+    pickerRef.value?.closePanel();
   } catch (e) {
     void alertDialog("保存岗位知识失败", e instanceof Error ? e.message : String(e));
   } finally {
@@ -298,7 +254,7 @@ const addDoc = async () => {
     notify(`已切分 ${result.count} 段（新增 ${result.inserted} / 复用 ${result.reused}），点「保存勾选」生效`);
     resetAddForm();
     showAdd.value = false;
-    open.value = true;
+    pickerRef.value?.openPanel();
   } catch (e) {
     void alertDialog("导入知识库失败", e instanceof Error ? e.message : String(e));
   } finally {
