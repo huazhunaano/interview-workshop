@@ -393,28 +393,31 @@ public class RetrievalService {
     }
 
     /**
-     * 检索范围（先定范围再打分）：
-     * 角色挂载优先 → 岗位分类次之 → 都没有就是全部启用文档。
+     * 检索范围：传了角色 code 就只按挂载；没传时按岗位分类，仍没有就是全部启用文档。
      *
-     * <p>挂载非空但指向的文档全被停用时返回空集合（不再退化成「全部」），
-     * 否则「考官没配语料」会静默变成「用整库语料」，这是更难发现的错。
+     * <p><b>角色传了 code 时，范围只由挂载决定</b>：一本没挂就是空范围，绝不回落成「整库」。
+     * 否则「考官没配语料」会静默变成「用所有人的语料」，角色之间的知识边界就失效了。
+     * 只有调用方没传角色（纯试搜 / 评测脚本）时才按岗位或整库检索。
+     *
+     * <p>挂载指向的文档全被停用时同样返回空集合。
      */
     private Set<Long> scopeDocIds(String interviewerCode, String jobCode) {
         if (interviewerCode != null && !interviewerCode.isBlank()) {
             List<InterviewerKnowledge> mounts = mountRepository.findByInterviewerCode(interviewerCode);
-            if (!mounts.isEmpty()) {
-                List<Long> mountedIds = new ArrayList<>(mounts.size());
-                for (InterviewerKnowledge mount : mounts) {
-                    mountedIds.add(mount.getDocId());
-                }
-                Set<Long> enabled = new HashSet<>();
-                for (KnowledgeDoc doc : docRepository.findAllById(mountedIds)) {
-                    if (Boolean.TRUE.equals(doc.getEnabled())) {
-                        enabled.add(doc.getId());
-                    }
-                }
-                return enabled;
+            List<Long> mountedIds = new ArrayList<>(mounts.size());
+            for (InterviewerKnowledge mount : mounts) {
+                mountedIds.add(mount.getDocId());
             }
+            if (mountedIds.isEmpty()) {
+                return Set.of();
+            }
+            Set<Long> enabled = new HashSet<>();
+            for (KnowledgeDoc doc : docRepository.findAllById(mountedIds)) {
+                if (Boolean.TRUE.equals(doc.getEnabled())) {
+                    enabled.add(doc.getId());
+                }
+            }
+            return enabled;
         }
         boolean byJob = jobCode != null && !jobCode.isBlank();
         Set<Long> ids = new HashSet<>();

@@ -67,6 +67,16 @@ class KnowledgeControllerTest {
                 .andExpect(jsonPath("$[1].chunkIndex").value(1));
     }
 
+    /** 非法 code 的 400 必须带中文 detail，前端才能显示具体原因。 */
+    @Test
+    void 非法code返回带中文detail的400() throws Exception {
+        mockMvc.perform(post("/api/knowledge/docs/Bad_Code/text")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"title\":\"x\",\"text\":\"abc\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.detail", containsString("文档 code 只能包含")));
+    }
+
     @Test
     void 建文档后列表接口返回该code() throws Exception {
         mockMvc.perform(post("/api/knowledge/docs")

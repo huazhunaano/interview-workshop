@@ -63,12 +63,28 @@ public class KnowledgeService {
         this.indexVersion = indexVersion;
     }
 
+    /** 文档 code 的合法格式：小写字母/数字开头，后续允许小写、数字、点、下划线、短横线。 */
+    private static final java.util.regex.Pattern DOC_CODE_PATTERN =
+            java.util.regex.Pattern.compile("[a-z0-9][a-z0-9._-]*");
+
+    /** 校验文档 code 格式；不合法直接 400，前端据此给具体中文提示。 */
+    private static void requireValidCode(String docCode) {
+        if (docCode == null || docCode.isBlank()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "文档 code 不能为空");
+        }
+        if (!DOC_CODE_PATTERN.matcher(docCode).matches()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "文档 code 只能包含小写字母、数字、点、下划线、短横线，且以字母或数字开头：" + docCode);
+        }
+    }
+
     /** 建文档；code 已存在抛 409 —— 幂等交给调用方（脚本按 code upsert）。 */
     @Transactional
     public KnowledgeDocView createDoc(CreateDocCommand cmd) {
-        if (cmd == null || cmd.code() == null || cmd.code().isBlank()) {
+        if (cmd == null) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "文档 code 不能为空");
         }
+        requireValidCode(cmd.code());
         if (cmd.title() == null || cmd.title().isBlank()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "文档 title 不能为空");
         }
@@ -260,9 +276,7 @@ public class KnowledgeService {
 
     /** 建或更新文档元信息；只覆盖传了值的字段，前端改标题不该把分类清空。 */
     private KnowledgeDoc upsertDoc(String docCode, String title, String category, String sourcePath) {
-        if (docCode == null || docCode.isBlank()) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "文档 code 不能为空");
-        }
+        requireValidCode(docCode);
         KnowledgeDoc doc = docRepository.findByCode(docCode).orElse(null);
         if (doc == null) {
             if (title == null || title.isBlank()) {

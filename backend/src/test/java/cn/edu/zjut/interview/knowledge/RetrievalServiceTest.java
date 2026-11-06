@@ -205,6 +205,20 @@ class RetrievalServiceTest {
                 "解绑后 JVM 文档仍被检索到，说明挂载范围没有立即生效");
     }
 
+    /** 6c. 角色一本没挂时范围必须为空：不能回落成整库，否则 B 会命中 A 的书。 */
+    @Test
+    void 零绑定角色的检索范围为空() {
+        knowledgeService.setDocCodesOf(ROLE, List.of());
+
+        assertEquals(0, retrievalService.scopeSize(ROLE, "java"), "零绑定的角色不该有任何检索范围");
+        assertTrue(retrievalService.search("垃圾回收器", ROLE, "java",
+                        RetrievalService.SearchOptions.defaults(), RetrievalService.RetrievalMode.HYBRID).isEmpty(),
+                "零绑定的角色不应命中任何片段");
+
+        // 不传角色的试搜/评测仍按岗位过滤，不受上面这条规则影响
+        assertEquals(2, retrievalService.scopeSize(null, "frontend"));
+    }
+
     /** 7. 版本失效：先查一次把索引缓存住，写入新片段后必须能立刻检索到。 */
     @Test
     void 写入新片段后缓存立即失效() {
