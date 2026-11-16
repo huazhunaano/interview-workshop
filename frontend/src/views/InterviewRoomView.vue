@@ -110,7 +110,8 @@ import FreeModeTools from "../components/tools/FreeModeTools.vue";
 import StatusInfoBar from "../components/tools/StatusInfoBar.vue";
 import ToolActivityStatus from "../components/tools/ToolActivityStatus.vue";
 import FullAccessWarning from "../components/tools/FullAccessWarning.vue";
-import { dimensionNames, jobs, questions as questionBank, type InterviewRecord } from "../data/mock";
+import { dimensionNames, jobs, questions as questionBank, type InterviewRecord, type Question } from "../data/mock";
+import { fetchQuestions, type QuestionItem } from "../api/questions";
 import { findInterviewer } from "../data/interviewers";
 import { confirmDialog } from "../store/dialogStore";
 import {
@@ -178,9 +179,43 @@ const card = computed(() => cardForCode(persona.value.code));
 /** 剧本面试才有固定题量；自由面试不设上限，用户点「结束面试」才收尾 */
 const isScript = computed(() => store.session.mode === "script");
 
+/** 后端题库（issue #1）：取到就用它，取不到回退本地 mock，保证断网也能演示 */
+const remoteQuestions = ref<Question[]>([]);
+
+/** 后端题 → 房间内部使用的 Question 形状（字段一一对应，只做 id/label 适配） */
+function toLocalQuestion(item: QuestionItem): Question {
+  return {
+    id: item.code,
+    jobId: item.jobCode,
+    kp: item.kpCode ?? "",
+    type: item.typeLabel,
+    difficulty: item.difficulty ?? "中等",
+    text: item.text,
+    reference: item.reference ?? "",
+    followUps: item.followUps,
+  };
+}
+
+let questionLoadSeq = 0;
+
+/** 切岗位时重新取题；请求失败或返回空都不报错，只是回退本地题库 */
+async function loadQuestions(jobId: string): Promise<void> {
+  const seq = ++questionLoadSeq;
+  try {
+    const items = await fetchQuestions(jobId, { limit: 100 });
+    if (seq !== questionLoadSeq) return;
+    remoteQuestions.value = items.map(toLocalQuestion);
+  } catch {
+    if (seq !== questionLoadSeq) return;
+    remoteQuestions.value = [];
+  }
+}
+
 /** 题库：先按知识点偏好排序。剧本面试截取 settings.questionCount 道，自由面试用整份循环 */
 const questionPool = computed(() => {
-  const all = questionBank.filter((q) => q.jobId === store.session.jobId);
+  const all = remoteQuestions.value.length
+    ? remoteQuestions.value
+    : questionBank.filter((q) => q.jobId === store.session.jobId);
   const preferred = all.filter((q) => store.settings.kps.includes(q.kp));
   const rest = all.filter((q) => !preferred.includes(q));
   const ordered = [...preferred, ...rest];
@@ -188,6 +223,15 @@ const questionPool = computed(() => {
   const target = Math.max(3, Math.min(8, store.settings.questionCount));
   return ordered.slice(0, target);
 });
+
+// 岗位确定或切换时取一次后端题库（immediate：直接访问 /interview 时 jobId 已存在）
+watch(
+  () => store.session.jobId,
+  (jobId) => {
+    if (jobId) void loadQuestions(jobId);
+  },
+  { immediate: true },
+);
 
 const progress = computed(() => {
   if (!isScript.value || !questionPool.value.length) return 0;

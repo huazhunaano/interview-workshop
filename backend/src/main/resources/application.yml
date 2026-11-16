@@ -47,8 +47,9 @@ spring:
       mode: always
       schema-locations: classpath:schema-h2.sql
       # data-h2.sql: 角色卡 + 用户身份；scripts-h2.sql: 剧本 + 章节（scripts-h2.sql 是种子数据的另一半，
-      # 健康检查里的 interview_script / interview_chapter 计数来自它）
-      data-locations: classpath:data-h2.sql,classpath:scripts-h2.sql
+      # 健康检查里的 interview_script / interview_chapter 计数来自它）；
+      # questions-h2.sql: 岗位题库（issue #1，按 code MERGE，可重复执行）
+      data-locations: classpath:data-h2.sql,classpath:scripts-h2.sql,classpath:questions-h2.sql
       continue-on-error: false
       encoding: UTF-8
   jpa:
