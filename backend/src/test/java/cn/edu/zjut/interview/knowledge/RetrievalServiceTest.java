@@ -53,6 +53,8 @@ class RetrievalServiceTest {
     @Autowired
     private RetrievalService retrievalService;
     @Autowired
+    private Bm25Retriever bm25Retriever;
+    @Autowired
     private KnowledgeService knowledgeService;
 
     @BeforeEach
@@ -149,8 +151,7 @@ class RetrievalServiceTest {
         assertTrue(top.score() > 0.0);
     }
 
-    /** 5. 阈值：不相关查询两路都不过阈值 => 整条丢掉，返回空列表（K4「不注入」的依据）。 */
-    @Test
+    /** 5. 阈值：不相关查询两路都不过阈值 => 整条丢掉，返回空列表（K4「不注入」的依据）。 */    @Test
     void 不相关查询被阈值逐条过滤成空列表() {
         assertTrue(retrievalService.search("今天天气怎么样", null, null,
                 RetrievalService.SearchOptions.defaults(), RetrievalService.RetrievalMode.HYBRID).isEmpty());
@@ -240,5 +241,70 @@ class RetrievalServiceTest {
         // 结果正文必须是原文：假设问题只在词表里起作用
         assertTrue(hits.stream().noneMatch(hit -> hit.text().contains("写屏障是干什么的")),
                 "假设问题漏进了结果正文：" + hits);
+    }
+
+    /** 9. issue #2：docCodes 把范围钉在指定文档上，范围外的一律不参与打分。 */
+    @Test
+    void 指定文档范围只在该文档内召回() {
+        RetrievalService.SearchOptions opts =
+                RetrievalService.SearchOptions.defaults().withTopK(5).withThresholds(0.0, 0.0);
+
+        List<KnowledgeHit> hits = retrievalService.searchByDocCodes("索引失效 打包优化", List.of(DB_DOC),
+                opts, RetrievalService.RetrievalMode.BM25_ONLY);
+
+        assertFalse(hits.isEmpty(), "指定文档内有强相关片段，不该空手");
+        assertTrue(hits.stream().allMatch(hit -> DB_DOC.equals(hit.docCode())),
+                "范围外文档混进了结果：" + hits);
+        assertEquals(2, retrievalService.scopeSizeByDocCodes(List.of(DB_DOC)));
+    }
+
+    /** 10. 同一句查询换一本“书”，命中必须来自另一篇——调试页「换一本书」的验收依据。 */
+    @Test
+    void 同一问题换文档范围命中不同文档() {
+        RetrievalService.SearchOptions opts =
+                RetrievalService.SearchOptions.defaults().withTopK(5).withThresholds(0.0, 0.0);
+        String query = "索引失效 打包优化";
+
+        List<KnowledgeHit> db = retrievalService.searchByDocCodes(query, List.of(DB_DOC),
+                opts, RetrievalService.RetrievalMode.BM25_ONLY);
+        List<KnowledgeHit> fe = retrievalService.searchByDocCodes(query, List.of(FE_DOC),
+                opts, RetrievalService.RetrievalMode.BM25_ONLY);
+
+        assertFalse(db.isEmpty());
+        assertFalse(fe.isEmpty());
+        assertTrue(db.stream().allMatch(hit -> DB_DOC.equals(hit.docCode())));
+        assertTrue(fe.stream().allMatch(hit -> FE_DOC.equals(hit.docCode())));
+        assertFalse(db.get(0).text().equals(fe.get(0).text()), "换书后第一名不应该相同");
+    }
+
+    /** 11. 未知/停用的 docCode 就是空范围，不能回落整库。 */
+    @Test
+    void 未知文档编码的范围为空() {
+        assertTrue(retrievalService.searchByDocCodes("索引失效", List.of(PREFIX + "missing"),
+                        RetrievalService.SearchOptions.defaults(), RetrievalService.RetrievalMode.BM25_ONLY).isEmpty());
+        assertEquals(0, retrievalService.scopeSizeByDocCodes(List.of(PREFIX + "missing")));
+        assertEquals(0, retrievalService.scopeSizeByDocCodes(List.of()));
+    }
+
+    /** 12. Retriever 契约：调用方只认接口，也能拿到按文档范围过滤后的命中。 */
+    @Test
+    void Retriever接口按文档范围返回命中() {
+        Retriever retriever = retrievalService;
+        List<KnowledgeHit> hits = retriever.retrieve("垃圾回收器", List.of(JVM_DOC), 5);
+
+        assertFalse(hits.isEmpty());
+        assertTrue(hits.stream().allMatch(hit -> JVM_DOC.equals(hit.docCode())),
+                "接口实现没有遵守文档范围：" + hits);
+    }
+
+    /** 13. Bm25Retriever：只走 BM25（向量分恒 0），且同样遵守文档范围。 */
+    @Test
+    void Bm25Retriever只走BM25且遵守文档范围() {
+        List<KnowledgeHit> hits = bm25Retriever.retrieve("垃圾回收器", List.of(JVM_DOC), 5);
+
+        assertFalse(hits.isEmpty());
+        assertTrue(hits.stream().allMatch(hit -> JVM_DOC.equals(hit.docCode())));
+        assertEquals(0.0, hits.get(0).vectorScore(), "纯 BM25 不应产生向量分");
+        assertTrue(hits.get(0).bm25Score() > 0.0);
     }
 }

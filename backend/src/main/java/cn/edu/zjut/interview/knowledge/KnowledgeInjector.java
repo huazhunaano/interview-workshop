@@ -76,10 +76,15 @@ public class KnowledgeInjector {
             return Injection.EMPTY;
         }
         int topK = configService.getInt(ConfigKey.KNOWLEDGE_INJECT_TOP_K);
+        // 单测里 RetrievalService 是 mock，defaultOptions() 可能为 null；退回 hashing 口径保证注入逻辑可测。
+        RetrievalService.SearchOptions base = retrievalService.defaultOptions();
+        if (base == null) {
+            base = RetrievalService.SearchOptions.defaults();
+        }
         List<KnowledgeHit> hits;
         try {
             hits = retrievalService.search(userInput, interviewerCode, jobCode,
-                    RetrievalService.SearchOptions.defaults().withTopK(topK),
+                    base.withTopK(topK),
                     RetrievalService.RetrievalMode.HYBRID);
         } catch (RuntimeException e) {
             // 索引重建失败、库连接抖动都算：这一轮就当他没配知识库，对话继续

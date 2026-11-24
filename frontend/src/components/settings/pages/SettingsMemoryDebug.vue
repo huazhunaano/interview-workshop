@@ -37,6 +37,77 @@
 
         <!-- 右栏：详情 -->
         <section class="min-h-0 flex-1 overflow-y-auto p-4">
+          <!-- 知识检索调试（issue #2）：范围内命中条目、排序与两路原始分都摆在这里 -->
+          <div class="mb-4 rounded-xl border border-cyan-400/25 bg-cyan-400/5 p-4">
+            <div class="mb-2 flex flex-wrap items-center gap-2">
+              <h4 class="text-sm font-semibold text-white">知识检索调试</h4>
+              <span class="text-xs text-white/50">指定文档范围检索，看命中的条目、排序与分数</span>
+            </div>
+            <div class="flex flex-wrap items-center gap-2">
+              <select
+                v-model="kbDocCode"
+                class="glass-input w-60 text-xs"
+                aria-label="选择检索文档范围"
+              >
+                <option value="">全部文档（不限范围）</option>
+                <option v-for="doc in kbDocs" :key="doc.code" :value="doc.code">
+                  {{ doc.title }}（{{ doc.chunkCount }} 段）
+                </option>
+              </select>
+              <select v-model="kbMode" class="glass-input w-28 text-xs" aria-label="检索模式">
+                <option value="bm25">bm25</option>
+                <option value="hybrid">hybrid</option>
+                <option value="vector">vector</option>
+              </select>
+              <label class="flex cursor-pointer items-center gap-1 text-xs text-white/60">
+                <input v-model="kbOpenThreshold" type="checkbox" class="cursor-pointer" />
+                放开门槛
+              </label>
+              <input
+                v-model="kbQuery"
+                class="glass-input min-w-[220px] flex-1"
+                placeholder="输入一个问题，看命中哪些片段"
+                aria-label="知识检索问题"
+                @keydown.enter="runKnowledgeSearch"
+              />
+              <button
+                class="btn-sm shrink-0"
+                :disabled="kbLoading || !kbQuery.trim()"
+                @click="runKnowledgeSearch"
+              >
+                {{ kbLoading ? "检索中…" : "检索" }}
+              </button>
+            </div>
+
+            <p v-if="kbError" class="mt-2 rounded-lg border border-red-400/40 bg-red-500/10 p-2 text-xs">
+              {{ kbError }}
+            </p>
+            <p v-if="kbScope !== null" class="mt-2 text-xs text-white/45">
+              检索范围 {{ kbScope }} 个片段
+            </p>
+
+            <div v-if="kbHits.length > 0" class="mt-2 space-y-2">
+              <div
+                v-for="hit in kbHits"
+                :key="hit.chunkId"
+                class="rounded-lg border border-white/10 bg-black/20 p-2"
+              >
+                <p class="text-[11px] text-white/40">
+                  {{ hit.docCode }} · {{ hit.docTitle }} · 片段 #{{ hit.chunkId }}
+                </p>
+                <p class="text-sm text-white/85">{{ hit.heading }}</p>
+                <p class="line-clamp-2 text-xs leading-relaxed text-white/50">{{ hit.text }}</p>
+                <p class="text-[11px] text-white/35">
+                  RRF {{ hit.score.toFixed(4) }} · 向量 {{ hit.vectorScore.toFixed(3) }} · BM25
+                  {{ hit.bm25Score.toFixed(2) }}
+                </p>
+              </div>
+            </div>
+            <p v-else-if="kbSearched && !kbLoading" class="mt-2 text-xs text-white/45">
+              没有命中（低于阈值就不注入）。
+            </p>
+          </div>
+
           <!-- 工具条 -->
           <div class="mb-4 flex flex-wrap items-center gap-3">
             <h3 class="text-base font-bold text-brand">
@@ -512,6 +583,12 @@ import {
   type MemoryImportance,
   type MemorySectionKey,
 } from "../../../data/mock";
+import {
+  listKnowledgeDocs,
+  searchKnowledge,
+  type KnowledgeDocView,
+  type KnowledgeHit,
+} from "../../../api/knowledge";
 
 /** 运行时生效值 = 底稿快照 + 本页可改的演示状态 */
 type MemoryRuntime = MemoryDebugSnapshot & { roleId: number };
@@ -557,6 +634,19 @@ const snapshot = ref<MemoryDebugSnapshot | null>(null);
 const selectedRoleId = ref<number | null>(null);
 const loading = ref(false);
 const error = ref("");
+
+/** 知识检索调试（issue #2）：文档范围 + 模式 + 命中结果与分数 */
+const kbDocs = ref<KnowledgeDocView[]>([]);
+const kbDocCode = ref("");
+const kbMode = ref<"hybrid" | "bm25" | "vector">("bm25");
+const kbQuery = ref("");
+const kbHits = ref<KnowledgeHit[]>([]);
+const kbScope = ref<number | null>(null);
+const kbLoading = ref(false);
+const kbSearched = ref(false);
+const kbError = ref("");
+/** 调试页默认放开门槛看候选；关掉后按注入侧默认阈值（验证“不相关问题不命中”）。 */
+const kbOpenThreshold = ref(true);
 
 const showStore = ref(true);
 const showInjected = ref(false);
@@ -847,6 +937,41 @@ const selectRole = (roleId: number) => {
   loadSnapshot(roleId);
 };
 
+const loadKnowledgeDocs = async () => {
+  try {
+    kbDocs.value = await listKnowledgeDocs();
+  } catch (e) {
+    kbError.value = e instanceof Error ? e.message : String(e);
+  }
+};
+
+/** 范围为空时传 undefined，交给后端按岗位/不限范围检索；选了文档才按 docCodes 限定。 */
+const runKnowledgeSearch = async () => {
+  const q = kbQuery.value.trim();
+  if (!q || kbLoading.value) return;
+  kbLoading.value = true;
+  kbError.value = "";
+  kbSearched.value = true;
+  try {
+    const result = await searchKnowledge(q, {
+      docCodes: kbDocCode.value ? [kbDocCode.value] : undefined,
+      mode: kbMode.value,
+      topK: 10,
+      // 调试页要看「候选与原始分」：阈值放开，否则弱字面重合的问题会直接显示为空，
+      // 无法判断是切分/召回问题还是阈值问题（注入侧仍使用默认阈值）。
+      ...(kbOpenThreshold.value ? { minVector: 0, minBm25: 0 } : {}),
+    });
+    kbHits.value = result.hits;
+    kbScope.value = result.scopeSize;
+  } catch (e) {
+    kbHits.value = [];
+    kbScope.value = null;
+    kbError.value = e instanceof Error ? e.message : String(e);
+  } finally {
+    kbLoading.value = false;
+  }
+};
+
 const refreshAll = () => {
   loading.value = true;
   error.value = "";
@@ -875,5 +1000,8 @@ const refreshAll = () => {
   }
 };
 
-onMounted(refreshAll);
+onMounted(() => {
+  refreshAll();
+  void loadKnowledgeDocs();
+});
 </script>

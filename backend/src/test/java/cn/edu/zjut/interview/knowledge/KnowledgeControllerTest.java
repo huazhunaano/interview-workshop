@@ -30,6 +30,8 @@ class KnowledgeControllerTest {
     private static final String CODE = "k1-ctrl-doc";
     /** K6 用另一篇文档，免得和上面那条用例互相污染。 */
     private static final String HYPE_CODE = "k6-ctrl-hype";
+    /** issue #2 文档范围检索用例的第二篇文档。 */
+    private static final String SCOPE_CODE = "k2-ctrl-scope";
 
     @Autowired
     private MockMvc mockMvc;
@@ -38,6 +40,7 @@ class KnowledgeControllerTest {
     void 清理用例数据() throws Exception {
         mockMvc.perform(delete("/api/knowledge/docs/" + CODE));
         mockMvc.perform(delete("/api/knowledge/docs/" + HYPE_CODE));
+        mockMvc.perform(delete("/api/knowledge/docs/" + SCOPE_CODE));
     }
 
     @Test
@@ -98,5 +101,54 @@ class KnowledgeControllerTest {
                 .andExpect(jsonPath("$.hits[0].docCode").value(HYPE_CODE))
                 .andExpect(jsonPath("$.hits[0].text")
                         .value("并发标记阶段用三色标记法，漏标由增量更新与原始快照修正"));
+    }
+
+    /**
+     * issue #2：{@code docCodes} 把检索范围钉在指定文档上。
+     *
+     * <p>同一句查询，限到 SCOPE_CODE 时只能看到它自己的片段；限到一个不存在的 code 时
+     * 范围为空、hits 为空——不能回落整库，否则「换一本书」的对比就失真了。
+     */
+    @Test
+    void 指定文档范围时只返回该文档的片段() throws Exception {
+        mockMvc.perform(post("/api/knowledge/docs")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"code\":\"" + HYPE_CODE + "\",\"title\":\"并发标记\",\"category\":\"test\"}"))
+                .andExpect(status().isOk());
+        mockMvc.perform(put("/api/knowledge/docs/" + HYPE_CODE + "/chunks")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"chunks":[{"heading":"并发标记","text":"并发标记阶段用三色标记法"}]}
+                                """))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(post("/api/knowledge/docs")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"code\":\"" + SCOPE_CODE + "\",\"title\":\"索引\",\"category\":\"test\"}"))
+                .andExpect(status().isOk());
+        mockMvc.perform(put("/api/knowledge/docs/" + SCOPE_CODE + "/chunks")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"chunks":[{"heading":"执行计划","text":"索引失效常见于函数包裹列与前缀模糊查询"}]}
+                                """))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(get("/api/knowledge/search")
+                        .param("q", "索引失效")
+                        .param("docCodes", SCOPE_CODE)
+                        .param("mode", "bm25")
+                        .param("minBm25", "0"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.scopeSize").value(1))
+                .andExpect(jsonPath("$.hits[0].docCode").value(SCOPE_CODE));
+
+        mockMvc.perform(get("/api/knowledge/search")
+                        .param("q", "索引失效")
+                        .param("docCodes", "k2-ctrl-missing")
+                        .param("mode", "bm25")
+                        .param("minBm25", "0"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.scopeSize").value(0))
+                .andExpect(jsonPath("$.hits").isEmpty());
     }
 }

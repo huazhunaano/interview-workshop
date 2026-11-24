@@ -4,6 +4,7 @@ import cn.edu.zjut.interview.dto.ChunkCommand;
 import cn.edu.zjut.interview.dto.CreateDocCommand;
 import cn.edu.zjut.interview.dto.KnowledgeDocView;
 import cn.edu.zjut.interview.dto.KnowledgeHit;
+import cn.edu.zjut.interview.knowledge.Bm25Retriever;
 import cn.edu.zjut.interview.knowledge.EmbeddingProvider;
 import cn.edu.zjut.interview.knowledge.HashingEmbeddingProvider;
 import cn.edu.zjut.interview.knowledge.RetrievalService;
@@ -42,6 +43,7 @@ public class KnowledgeController {
 
     private final KnowledgeService service;
     private final RetrievalService retrievalService;
+    private final Bm25Retriever bm25Retriever;
     private final KnowledgeDocRepository docRepository;
     private final KnowledgeChunkRepository chunkRepository;
     private final KnowledgeVectorRepository vectorRepository;
@@ -49,12 +51,14 @@ public class KnowledgeController {
 
     public KnowledgeController(KnowledgeService service,
                                RetrievalService retrievalService,
+                               Bm25Retriever bm25Retriever,
                                KnowledgeDocRepository docRepository,
                                KnowledgeChunkRepository chunkRepository,
                                KnowledgeVectorRepository vectorRepository,
                                EmbeddingProvider embeddingProvider) {
         this.service = service;
         this.retrievalService = retrievalService;
+        this.bm25Retriever = bm25Retriever;
         this.docRepository = docRepository;
         this.chunkRepository = chunkRepository;
         this.vectorRepository = vectorRepository;
@@ -166,6 +170,7 @@ public class KnowledgeController {
     public SearchView search(@RequestParam(name = "q", required = false) String q,
                              @RequestParam(name = "interviewerCode", required = false) String interviewerCode,
                              @RequestParam(name = "jobCode", required = false) String jobCode,
+                             @RequestParam(name = "docCodes", required = false) String docCodes,
                              @RequestParam(name = "topK", required = false) Integer topK,
                              @RequestParam(name = "mode", required = false) String mode,
                              @RequestParam(name = "minVector", required = false) Double minVector,
@@ -177,7 +182,7 @@ public class KnowledgeController {
         }
         // topK 缺省/非法用默认 5，超过上限（20）由 withTopK 截断
         RetrievalService.SearchOptions options =
-                RetrievalService.SearchOptions.defaults().withTopK(topK == null ? 0 : topK);
+                retrievalService.defaultOptions().withTopK(topK == null ? 0 : topK);
         // 阈值可覆盖：前端「试搜」要放开门槛看全部候选，评测脚本也要看未过滤的原始分
         if (minVector != null || minBm25 != null) {
             options = options.withThresholds(
@@ -191,9 +196,31 @@ public class KnowledgeController {
                     wBm25 == null ? options.bm25Weight() : wBm25);
         }
         RetrievalService.RetrievalMode resolved = RetrievalService.RetrievalMode.parse(mode);
-        List<KnowledgeHit> hits = retrievalService.search(q, interviewerCode, jobCode, options, resolved);
-        return new SearchView(q, resolved.wireName(),
-                retrievalService.scopeSize(interviewerCode, jobCode), options.topK(), hits);
+        // docCodes 非空时只在这些文档内检索（issue #2「同一问题换一本书」的调试入口）；
+        // 空集合不回落整库：范围是调用方明确指定的，调错就该看到空结果。
+        List<String> codes = new ArrayList<>();
+        if (docCodes != null) {
+            for (String code : docCodes.split(",")) {
+                if (!code.isBlank()) {
+                    codes.add(code.trim());
+                }
+            }
+        }
+        List<KnowledgeHit> hits;
+        int scopeSize;
+        boolean noOverrides = minVector == null && minBm25 == null && wVector == null && wBm25 == null;
+        if (codes.isEmpty()) {
+            hits = retrievalService.search(q, interviewerCode, jobCode, options, resolved);
+            scopeSize = retrievalService.scopeSize(interviewerCode, jobCode);
+        } else if (resolved == RetrievalService.RetrievalMode.BM25_ONLY && noOverrides) {
+            // 纯 BM25 + 指定文档：走独立的 Bm25Retriever（不触碰 embedding 服务）
+            hits = bm25Retriever.retrieve(q, codes, options.topK());
+            scopeSize = retrievalService.scopeSizeByDocCodes(codes);
+        } else {
+            hits = retrievalService.searchByDocCodes(q, codes, options, resolved);
+            scopeSize = retrievalService.scopeSizeByDocCodes(codes);
+        }
+        return new SearchView(q, resolved.wireName(), scopeSize, options.topK(), hits);
     }
 
     /** 建文档请求体：字段与 {@link CreateDocCommand} 一一对应。 */

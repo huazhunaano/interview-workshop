@@ -41,7 +41,7 @@ import java.util.Set;
  * 因为知识库随时可能被导入脚本改写。{@code volatile} 快照 + 双检锁保证只重建一次。
  */
 @Service
-public class RetrievalService {
+public class RetrievalService implements Retriever {
 
     private static final Logger log = LoggerFactory.getLogger(RetrievalService.class);
 
@@ -51,18 +51,19 @@ public class RetrievalService {
     private static final int DEFAULT_TOP_K = 5;
 
     /**
-     * 阈值依据 {@code scripts/eval_knowledge.py --calibrate} 的 26 正 / 6 负实测分布：
+     * 阈值分两套，因为 hashing 与真实语义向量的分数量纲不同：
      * <ul>
-     *   <li>BM25：正样本最低 2.47、负样本最高 2.69 —— 3.0 能拦掉全部负样本，
-     *       代价是「堆和栈分别放什么东西」「@Transactional 什么时候失效」这两条弱字面重合的问题查不到。
-     *       门槛是<b>注入</b>的门槛，宁漏不错：把无关内容塞进 prompt 比不塞更伤回答。</li>
-     *   <li>向量：正样本最低 0.132、负样本最高 0.184，<b>两堆重叠，hashing 实现下向量分不能当门槛</b>。
-     *       0.30 只在「查询与片段字面高度重合」时才通过（实测 0.3~0.6），
-     *       等于把实际筛选权交给 BM25；换真语义模型后这个值必须重新标定。</li>
+     *   <li><b>hashing</b>（测试/断网）：0.30 / 3.0，两路任一过线即可。hashing 向量分天然偏低，
+     *       且正负样本区间重叠，只能靠 BM25 承担主要筛选。</li>
+     *   <li><b>真实 embedding</b>（bge-m3，2026-11-24 标定）：0.50 / 4.0，且<b>两路都要过</b>。
+     *       26 条正样本最低分：向量 0.544 / BM25 4.30；6 条负样本最高分：向量 0.453 / BM25 8.49。
+     *       单路都会误放（负样本 BM25 可到 8.49），两路同时过线后正样本全过、负样本全拦。</li>
      * </ul>
      */
-    private static final double DEFAULT_MIN_VECTOR_SCORE = 0.30;
-    private static final double DEFAULT_MIN_BM25_SCORE = 3.0;
+    private static final double HASHING_MIN_VECTOR_SCORE = 0.30;
+    private static final double HASHING_MIN_BM25_SCORE = 3.0;
+    private static final double REAL_MIN_VECTOR_SCORE = 0.50;
+    private static final double REAL_MIN_BM25_SCORE = 4.0;
 
     /**
      * 两路权重（加权 RRF 的投票权）。权重扫描结果（26 条正样本，Hit@1 / Hit@3 / MRR）：
@@ -90,6 +91,9 @@ public class RetrievalService {
     private final EmbeddingProvider embeddingProvider;
     private final KnowledgeIndexVersion indexVersion;
 
+    /** 是否为真实语义向量：决定用哪套阈值与“单路/双路”判定。 */
+    private final boolean realVectors;
+
     /** 当前快照；null 表示还没建过。 */
     private volatile RetrievalIndex cache;
     /** 快照对应的版本号。 */
@@ -107,6 +111,19 @@ public class RetrievalService {
         this.mountRepository = mountRepository;
         this.embeddingProvider = embeddingProvider;
         this.indexVersion = indexVersion;
+        this.realVectors = !(embeddingProvider instanceof HashingEmbeddingProvider);
+    }
+
+    /**
+     * 当前 provider 对应的默认阈值：真实语义向量用 0.50/4.0 且混合模式两路都过；
+     * hashing 用 0.30/3.0 且混合模式任一过线即可（分数不可比，见类注释）。
+     */
+    public SearchOptions defaultOptions() {
+        if (!realVectors) {
+            return SearchOptions.defaults();
+        }
+        return new SearchOptions(DEFAULT_TOP_K, REAL_MIN_VECTOR_SCORE, REAL_MIN_BM25_SCORE,
+                DEFAULT_VECTOR_WEIGHT, DEFAULT_BM25_WEIGHT);
     }
 
     /**
@@ -122,7 +139,7 @@ public class RetrievalService {
                                 double vectorWeight, double bm25Weight) {
 
         public static SearchOptions defaults() {
-            return new SearchOptions(DEFAULT_TOP_K, DEFAULT_MIN_VECTOR_SCORE, DEFAULT_MIN_BM25_SCORE,
+            return new SearchOptions(DEFAULT_TOP_K, HASHING_MIN_VECTOR_SCORE, HASHING_MIN_BM25_SCORE,
                     DEFAULT_VECTOR_WEIGHT, DEFAULT_BM25_WEIGHT);
         }
 
@@ -185,6 +202,31 @@ public class RetrievalService {
      */
     public List<KnowledgeHit> search(String query, String interviewerCode, String jobCode,
                                      SearchOptions options, RetrievalMode mode) {
+        return searchScoped(query, scopeDocIds(interviewerCode, jobCode), options, mode);
+    }
+
+    /**
+     * 按文档范围检索（issue #2 的 Retriever 契约）：只在给定 doc code 内打分。
+     * 空集合表示「明确没有范围」，不回落整库——否则调错范围会把无关资料注进 prompt。
+     */
+    public List<KnowledgeHit> searchByDocCodes(String query, List<String> docCodes,
+                                               SearchOptions options, RetrievalMode mode) {
+        return searchScoped(query, docIdsByCodes(docCodes), options, mode);
+    }
+
+    @Override
+    public List<KnowledgeHit> retrieve(String query, List<String> docCodes, int topK) {
+        return searchByDocCodes(query, docCodes,
+                SearchOptions.defaults().withTopK(topK), RetrievalMode.HYBRID);
+    }
+
+    /** 指定文档范围内的片段数；未知/停用文档不计入。 */
+    public int scopeSizeByDocCodes(List<String> docCodes) {
+        return scopePositions(currentIndex(), docIdsByCodes(docCodes)).size();
+    }
+
+    private List<KnowledgeHit> searchScoped(String query, Set<Long> docIds,
+                                            SearchOptions options, RetrievalMode mode) {
         if (query == null || query.isBlank()) {
             return List.of();
         }
@@ -194,7 +236,7 @@ public class RetrievalService {
         int topK = opts.topK() <= 0 ? DEFAULT_TOP_K : Math.min(opts.topK(), MAX_TOP_K);
 
         RetrievalIndex index = currentIndex();
-        List<Integer> scope = scopePositions(index, interviewerCode, jobCode);
+        List<Integer> scope = scopePositions(index, docIds);
         if (scope.isEmpty()) {
             return List.of();
         }
@@ -223,12 +265,18 @@ public class RetrievalService {
             candidate.vectorScore = vectorScores.get(position);
         }
 
-        // 阈值是逐条判定：融合后排名靠后的条目可能只被某一路以极低分召回，注进提示词就是噪声。
+        // 阈值逐条判定：混合模式要求两路都过，单路模式只判自己那一路。
         // 「问今天天气」这类不相关问题靠这里整条丢掉，最终返回空列表。
         List<Candidate> passed = new ArrayList<>(fused.size());
         for (Candidate candidate : fused.values()) {
-            if (candidate.vectorScore >= opts.minVectorScore()
-                    || candidate.bm25Score >= opts.minBm25Score()) {
+            boolean vectorOk = candidate.vectorScore >= opts.minVectorScore();
+            boolean bm25Ok = candidate.bm25Score >= opts.minBm25Score();
+            boolean pass = switch (effective) {
+                case BM25_ONLY -> bm25Ok;
+                case VECTOR_ONLY -> vectorOk;
+                case HYBRID -> realVectors ? (vectorOk && bm25Ok) : (vectorOk || bm25Ok);
+            };
+            if (pass) {
                 passed.add(candidate);
             }
         }
@@ -317,6 +365,17 @@ public class RetrievalService {
                     chunk.getHeading(), chunk.getText(), chunk.getHypeQuestions()));
         }
 
+        // 真实 embedding 的维度是「第一次调用后才知道」（provider 里 lazy 设置）。
+        // 如果启动后第一次检索就建索引，dim 还是 0，会按 dim=0 过滤掉全部向量并把这份空索引缓存住，
+        // 之后即使查询已经把 dimension 设为 1024，缓存也不会自动失效。这里先预热一次拿到维度。
+        if (!(embeddingProvider instanceof HashingEmbeddingProvider) && embeddingProvider.dimension() <= 0) {
+            try {
+                embeddingProvider.embed("维度预热");
+            } catch (RuntimeException e) {
+                // 预热失败（断网/key 失效）只影响向量路，BM25 仍要能用
+                log.warn("[Knowledge] embedding 维度预热失败，本次索引不含向量：{}", e.getMessage());
+            }
+        }
         int dim = embeddingProvider.dimension();
         Map<Long, float[]> vectorByChunkId = new HashMap<>();
         for (KnowledgeVector row : vectorRepository.findByModelAndDim(embeddingProvider.modelName(), dim)) {
@@ -390,7 +449,10 @@ public class RetrievalService {
 
     /** 把范围映射成索引下标（不重建索引，只做过滤）。下标顺序天然是 chunk_id 升序。 */
     private List<Integer> scopePositions(RetrievalIndex index, String interviewerCode, String jobCode) {
-        Set<Long> docIds = scopeDocIds(interviewerCode, jobCode);
+        return scopePositions(index, scopeDocIds(interviewerCode, jobCode));
+    }
+
+    private List<Integer> scopePositions(RetrievalIndex index, Set<Long> docIds) {
         if (docIds.isEmpty() || index.size() == 0) {
             return List.of();
         }
@@ -402,6 +464,23 @@ public class RetrievalService {
             }
         }
         return positions;
+    }
+
+    /** doc code → 启用的文档 id；未知 code、停用文档直接忽略（宁缺勿错）。 */
+    private Set<Long> docIdsByCodes(List<String> docCodes) {
+        if (docCodes == null || docCodes.isEmpty()) {
+            return Set.of();
+        }
+        Set<Long> ids = new HashSet<>();
+        for (String code : docCodes) {
+            if (code == null || code.isBlank()) {
+                continue;
+            }
+            docRepository.findByCode(code.trim())
+                    .filter(doc -> Boolean.TRUE.equals(doc.getEnabled()))
+                    .ifPresent(doc -> ids.add(doc.getId()));
+        }
+        return ids;
     }
 
     // ------------------------------------------------------------------ 两路召回

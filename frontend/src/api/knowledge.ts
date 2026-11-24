@@ -140,6 +140,8 @@ export async function searchKnowledge(
   opts?: {
     interviewerCode?: string;
     jobCode?: string;
+    /** 只在这些文档内检索；空数组/未传 = 不限制（由 interviewerCode / jobCode 决定范围）。 */
+    docCodes?: string[];
     topK?: number;
     mode?: "hybrid" | "bm25" | "vector";
     minVector?: number;
@@ -149,6 +151,7 @@ export async function searchKnowledge(
   const params = new URLSearchParams({ q });
   if (opts?.interviewerCode) params.set("interviewerCode", opts.interviewerCode);
   if (opts?.jobCode) params.set("jobCode", opts.jobCode);
+  if (opts?.docCodes?.length) params.set("docCodes", opts.docCodes.join(","));
   if (opts?.topK != null) params.set("topK", String(opts.topK));
   if (opts?.mode) params.set("mode", opts.mode);
   if (opts?.minVector != null) params.set("minVector", String(opts.minVector));
