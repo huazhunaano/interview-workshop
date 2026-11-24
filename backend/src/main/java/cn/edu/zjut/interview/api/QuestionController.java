@@ -2,6 +2,7 @@ package cn.edu.zjut.interview.api;
 
 import cn.edu.zjut.interview.domain.InterviewQuestion;
 import cn.edu.zjut.interview.dto.QuestionView;
+import cn.edu.zjut.interview.question.JobCodes;
 import cn.edu.zjut.interview.question.QuestionType;
 import cn.edu.zjut.interview.repository.InterviewQuestionRepository;
 import com.fasterxml.jackson.core.type.TypeReference;
@@ -49,7 +50,7 @@ public class QuestionController {
     /**
      * 按岗位取题。
      *
-     * @param jobCode 岗位编码（java / frontend），必填
+     * @param jobCode 岗位编码，必填；{@code java} / {@code java-backend} 等常见写法都折到标准值
      * @param type    题型，可选；英文 code 或中文标签都认
      * @param limit   返回条数，默认 20、最多 100
      */
@@ -70,7 +71,7 @@ public class QuestionController {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, e.getMessage());
         }
 
-        String code = jobCode.trim();
+        String code = JobCodes.normalize(jobCode);
         List<InterviewQuestion> rows = questionType == null
                 ? repository.findByJobCodeAndEnabledTrueOrderBySortOrderAscIdAsc(code)
                 : repository.findByJobCodeAndTypeCodeAndEnabledTrueOrderBySortOrderAscIdAsc(

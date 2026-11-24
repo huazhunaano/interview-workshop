@@ -103,4 +103,31 @@ class QuestionControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.length()").value(5));
     }
+
+    /** issue #1 的备料要求：两个岗位四种题型各不少于 20 题。 */
+    @Test
+    void 两岗位四类题型各二十题() throws Exception {
+        for (String job : new String[]{"java", "frontend"}) {
+            for (String type : new String[]{"technical", "project", "scenario", "behavior"}) {
+                mockMvc.perform(get("/api/questions")
+                                .param("jobCode", job)
+                                .param("type", type)
+                                .param("limit", "100"))
+                        .andExpect(status().isOk())
+                        .andExpect(jsonPath("$.length()").value(greaterThanOrEqualTo(20)));
+            }
+        }
+    }
+
+    /** 验收示例里的 jobCode 是 java-backend，必须能折到库里的 java。 */
+    @Test
+    void 岗位别名javaBackend可用() throws Exception {
+        mockMvc.perform(get("/api/questions")
+                        .param("jobCode", "java-backend")
+                        .param("type", "technical")
+                        .param("limit", "100"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(greaterThanOrEqualTo(20)))
+                .andExpect(jsonPath("$[0].jobCode").value("java"));
+    }
 }

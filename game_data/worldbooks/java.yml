@@ -1,0 +1,719 @@
+name: Java 后端岗位知识库
+description: Java 后端面试常用知识点，共 100 条，按关键词命中注入（issue #1 的世界书 / 岗位知识库）。
+job_code: java
+entries:
+  # ---------------- JVM（15 条）----------------
+  - id: java-jvm-01
+    name: JVM 运行时数据区
+    priority: 90
+    activation:
+      type: keyword
+      keys: [JVM 内存, 运行时数据区, OOM]
+    content: 运行时数据区分为程序计数器、虚拟机栈、本地方法栈、堆、方法区五块，外加直接内存。程序计数器不会 OOM；虚拟机栈溢出抛 StackOverflowError；堆与方法区（元空间）不足抛 OutOfMemoryError。
+  - id: java-jvm-02
+    name: 对象创建过程
+    priority: 80
+    activation:
+      type: keyword
+      keys: [对象创建, new 对象, 内存分配]
+    content: 类加载检查通过后分配内存，分配方式有指针碰撞与空闲列表；并发分配靠 CAS 或 TLAB。内存置零后设置对象头（Mark Word 与类型指针），再执行构造方法。逃逸分析通过时可能直接栈上分配或标量替换。
+  - id: java-jvm-03
+    name: 垃圾判定算法
+    priority: 80
+    activation:
+      type: keyword
+      keys: [垃圾回收, 可达性分析, 引用计数]
+    content: 主流 JVM 用可达性分析，从 GC Roots（栈局部变量、静态变量、常量、JNI 引用等）出发标记存活对象，不可达即可回收。引用计数无法处理循环引用，JVM 不采用。引用分强、软、弱、虚四种。
+  - id: java-jvm-04
+    name: 分代收集与收集算法
+    priority: 85
+    activation:
+      type: keyword
+      keys: [分代收集, 复制算法, 标记整理]
+    content: 新生代对象朝生夕死，用复制算法（Eden 加两块 Survivor）；老年代存活率高，用标记清除或标记整理。跨代引用用卡表记录，避免每次 Young GC 扫全堆。
+  - id: java-jvm-05
+    name: 常见垃圾收集器
+    priority: 80
+    activation:
+      type: keyword
+      keys: [垃圾收集器, G1, CMS, ZGC]
+    content: Serial 单线程适合客户端；ParNew 与 CMS 搭配追求低停顿；Parallel 追求吞吐；G1 按 Region 管理、可预测停顿；ZGC 与 Shenandoah 用染色指针与读屏障做到毫秒级停顿。JDK 17 默认 G1。
+  - id: java-jvm-06
+    name: 类加载过程
+    priority: 85
+    activation:
+      type: keyword
+      keys: [类加载, 初始化, clinit]
+    content: 加载、验证、准备、解析、初始化五步。准备阶段给静态变量赋零值，初始化阶段执行 clinit 赋真实值。触发初始化的情况包括 new、访问静态成员、反射、子类初始化、启动主类。
+  - id: java-jvm-07
+    name: 双亲委派模型
+    priority: 85
+    activation:
+      type: keyword
+      keys: [双亲委派, 类加载器, ClassLoader]
+    content: 类加载请求先交给父加载器，父加载器加载不了才自己加载，保证核心类不被篡改。打破场景有 SPI 用线程上下文类加载器、Tomcat 每个 webapp 独立加载器、OSGi 网状委派。自定义加载器重写 findClass 而不是 loadClass。
+  - id: java-jvm-08
+    name: JVM 参数与调优
+    priority: 70
+    activation:
+      type: keyword
+      keys: [JVM 参数, 堆大小, 调优]
+    content: 常用参数有 Xms 与 Xmx（建议设为相等避免动态扩容）、MetaspaceSize、MaxDirectMemorySize、GC 收集器选择。调优先看 GC 日志与监控，再动参数；不要只靠调大堆解决内存泄漏。
+  - id: java-jvm-09
+    name: G1 收集器工作原理
+    priority: 75
+    activation:
+      type: keyword
+      keys: [G1, Region, 混合回收]
+    content: 堆被划分为大小相等的 Region，逻辑上仍有新生代与老年代。Young GC 回收 Eden 与 Survivor；并发标记后做 Mixed GC，优先回收垃圾最多的 Region，靠 -XX:MaxGCPauseMillis 控制目标停顿。
+  - id: java-jvm-10
+    name: 内存屏障与指令重排
+    priority: 70
+    activation:
+      type: keyword
+      keys: [内存屏障, 指令重排, 内存模型]
+    content: 编译器与 CPU 为优化性能会重排指令，JMM 用 happens-before 规则约束可见性。volatile 写前插 StoreStore、写后插 StoreLoad，读后插 LoadLoad 与 LoadStore，禁止相关重排。
+  - id: java-jvm-11
+    name: JVM 内存溢出类型
+    priority: 75
+    activation:
+      type: keyword
+      keys: [内存溢出, 元空间溢出, 直接内存]
+    content: 堆溢出报 Java heap space，多为对象只增不减或缓存无上限；元空间溢出报 Metaspace，多为动态生成类过多；直接内存溢出多为 NIO 或 Netty 未释放；栈溢出是递归过深。排查手段各不相同。
+  - id: java-jvm-12
+    name: jstack 与线程栈分析
+    priority: 70
+    activation:
+      type: keyword
+      keys: [jstack, 线程栈, 死锁]
+    content: jstack 导出线程栈，可看线程状态、锁持有与等待。死锁会直接打印 Found one Java-level deadlock。高频排查组合是 top 找进程、top -Hp 找线程、printf 转十六进制、jstack 搜 nid。
+  - id: java-jvm-13
+    name: jmap 与堆快照
+    priority: 70
+    activation:
+      type: keyword
+      keys: [jmap, 堆快照, MAT]
+    content: jmap -dump 导出堆快照，用 MAT 或 JProfiler 打开，看支配树与直方图找大对象。线上建议配置 HeapDumpOnOutOfMemoryError 自动 dump，并限制 dump 目录磁盘占用。
+  - id: java-jvm-14
+    name: 逃逸分析与锁消除
+    priority: 65
+    activation:
+      type: keyword
+      keys: [逃逸分析, 栈上分配, 锁消除]
+    content: JIT 在编译期分析对象作用域，不逃逸的对象可栈上分配、标量替换，减少 GC 压力；同步块锁对象不会逃逸时可锁消除。依赖即时编译，解释执行阶段不生效。
+  - id: java-jvm-15
+    name: JVM 故障排查工具箱
+    priority: 65
+    activation:
+      type: keyword
+      keys: [arthas, jstat, 故障排查]
+    content: jstat 看 GC 频率与各代占用；jinfo 看与改参数；arthas 的 dashboard、thread、trace、watch 可在线定位；async-profiler 采火焰图。先用指标缩小范围，再上重型工具。
+
+  # ---------------- 集合（12 条）----------------
+  - id: java-coll-01
+    name: HashMap 底层结构
+    priority: 85
+    activation:
+      type: keyword
+      keys: [HashMap, 哈希表, 红黑树]
+    content: JDK 8 用数组加链表加红黑树。数组长度是 2 的幂，下标用 hash 与长度减一做与运算。链表长度到 8 且容量不小于 64 才树化，退化阈值是 6，避免频繁转换。
+  - id: java-coll-02
+    name: HashMap 扩容机制
+    priority: 80
+    activation:
+      type: keyword
+      keys: [HashMap 扩容, 负载因子, rehash]
+    content: 默认容量 16、负载因子 0.75，元素数超过阈值就扩容为两倍。JDK 8 扩容时利用高位判断把节点拆成两条链，避免重新计算哈希。并发扩容仍不安全，要用 ConcurrentHashMap。
+  - id: java-coll-03
+    name: ArrayList 扩容
+    priority: 75
+    activation:
+      type: keyword
+      keys: [ArrayList, 扩容, 数组]
+    content: 默认空数组，首次 add 初始化容量 10，之后按 1.5 倍扩容并复制元素。随机访问快，中间插入删除要移动元素。已知大小时用带容量构造器避免多次扩容。
+  - id: java-coll-04
+    name: LinkedList 与 ArrayDeque
+    priority: 65
+    activation:
+      type: keyword
+      keys: [LinkedList, ArrayDeque, 队列]
+    content: LinkedList 是双向链表，头尾操作 O(1)，按索引访问 O(n)，每个节点额外两个引用。当队列或栈用优先 ArrayDeque，基于环形数组、更快且不允许 null。
+  - id: java-coll-05
+    name: ConcurrentHashMap 线程安全
+    priority: 85
+    activation:
+      type: keyword
+      keys: [ConcurrentHashMap, 分段锁, CAS]
+    content: JDK 8 放弃分段锁，用 CAS 初始化与插入，桶为空时 CAS，桶非空时 synchronized 锁头节点；扩容支持多线程协助 transfer。size 是弱一致的，并发下不强求精确。
+  - id: java-coll-06
+    name: HashMap 与 Hashtable 区别
+    priority: 65
+    activation:
+      type: keyword
+      keys: [Hashtable, 线程安全, 同步]
+    content: Hashtable 所有方法加 synchronized，整表锁、并发度低，且不允许 null 键值；HashMap 不同步、允许一个 null 键。并发场景应选 ConcurrentHashMap，不是 Hashtable。
+  - id: java-coll-07
+    name: 红黑树特性
+    priority: 70
+    activation:
+      type: keyword
+      keys: [红黑树, 自平衡, 树化]
+    content: 红黑树是近似平衡的二叉查找树，根黑、叶子黑、红节点子节点必黑、任一节点到叶子的黑高相同。插入删除靠变色与旋转维持平衡，最坏查找 O(log n)，比 AVL 插入代价小。
+  - id: java-coll-08
+    name: TreeMap 与排序
+    priority: 65
+    activation:
+      type: keyword
+      keys: [TreeMap, 排序, Comparator]
+    content: TreeMap 基于红黑树，按 key 自然顺序或传入的 Comparator 排序，查找插入删除 O(log n)。要做范围查询用 subMap、headMap、tailMap；key 不能为 null，除非自定义比较器。
+  - id: java-coll-09
+    name: 集合遍历删除
+    priority: 70
+    activation:
+      type: keyword
+      keys: [fail-fast, Iterator, 并发修改异常]
+    content: for 循环里直接 list.remove 会抛 ConcurrentModificationException，因为 modCount 与期望值不一致。正确做法是用 Iterator.remove 或 removeIf；并发集合的迭代器是弱一致的，不抛该异常。
+  - id: java-coll-10
+    name: CopyOnWriteArrayList
+    priority: 65
+    activation:
+      type: keyword
+      keys: [CopyOnWriteArrayList, 写时复制]
+    content: 写操作复制新数组再替换引用，读不加锁，适合读多写极少、数据量小的场景（如监听器列表）。缺点是写开销大、内存占用翻倍，不适合频繁写。
+  - id: java-coll-11
+    name: equals 与 hashCode 契约
+    priority: 75
+    activation:
+      type: keyword
+      keys: [equals, hashCode, 哈希冲突]
+    content: 两个对象 equals 相等则 hashCode 必须相等，反之不要求。重写 equals 必须重写 hashCode，否则放进 HashSet 或 HashMap 会查不到。参与哈希的字段应不可变。
+  - id: java-coll-12
+    name: 集合选型建议
+    priority: 60
+    activation:
+      type: keyword
+      keys: [集合选型, List, Set, Map]
+    content: 需要索引访问用 ArrayList；需要去重且有序用 LinkedHashSet；需要排序用 TreeSet；键值查找用 HashMap；并发场景用 ConcurrentHashMap 或 CopyOnWriteArrayList；队列用 ArrayDeque 或阻塞队列。
+
+  # ---------------- 并发（15 条）----------------
+  - id: java-conc-01
+    name: 线程生命周期
+    priority: 75
+    activation:
+      type: keyword
+      keys: [线程状态, 线程生命周期]
+    content: NEW、RUNNABLE、BLOCKED、WAITING、TIMED_WAITING、TERMINATED 六种。BLOCKED 是等 synchronized 锁，WAITING 是 wait 或 join 无超时，TIMED_WAITING 带超时。注意没有 RUNNING 状态。
+  - id: java-conc-02
+    name: 线程池参数
+    priority: 85
+    activation:
+      type: keyword
+      keys: [线程池, 核心线程, 拒绝策略]
+    content: 核心线程数、最大线程数、空闲存活时间、工作队列、线程工厂、拒绝策略。执行顺序是先核心线程、再入队、队列满才扩到最大线程数、仍满则拒绝。生产上要自定义线程名便于排查。
+  - id: java-conc-03
+    name: 线程池拒绝策略
+    priority: 75
+    activation:
+      type: keyword
+      keys: [拒绝策略, AbortPolicy, CallerRunsPolicy]
+    content: AbortPolicy 抛 RejectedExecutionException；CallerRunsPolicy 让提交线程自己执行，形成天然反压；DiscardPolicy 静默丢弃；DiscardOldestPolicy 丢最老任务。核心业务建议自定义记录日志并降级。
+  - id: java-conc-04
+    name: 无界队列的风险
+    priority: 70
+    activation:
+      type: keyword
+      keys: [无界队列, LinkedBlockingQueue, OOM]
+    content: 用 LinkedBlockingQueue 不指定容量等于无界，最大线程数永远用不上，任务堆积导致内存上涨甚至 OOM，且延迟不可控。应使用有界队列并配合理拒绝策略与监控队列长度。
+  - id: java-conc-05
+    name: synchronized 原理
+    priority: 80
+    activation:
+      type: keyword
+      keys: [synchronized, 监视器锁, 锁升级]
+    content: 基于对象头 Mark Word 与 Monitor，字节码是 monitorenter 与 monitorexit。JDK 6 后有偏向锁、轻量级锁、重量级锁的升级，目的是减少无竞争时的开销。锁的是对象不是代码。
+  - id: java-conc-06
+    name: volatile 语义
+    priority: 85
+    activation:
+      type: keyword
+      keys: [volatile, 可见性, 指令重排]
+    content: 保证可见性与禁止重排，不保证原子性。写 volatile 变量 happens-before 于后续读。i++ 这类读改写需要 AtomicInteger 或加锁。双重检查锁必须给实例字段加 volatile。
+  - id: java-conc-07
+    name: AQS 原理
+    priority: 85
+    activation:
+      type: keyword
+      keys: [AQS, 同步队列, ReentrantLock]
+    content: 用 volatile int state 表示同步状态，FIFO 双向队列存等待线程，获取失败入队并 park，释放时唤醒后继。ReentrantLock 非公平锁直接 CAS 抢，公平锁先看有无前驱。
+  - id: java-conc-08
+    name: ReentrantLock 与 synchronized 对比
+    priority: 75
+    activation:
+      type: keyword
+      keys: [ReentrantLock, 可重入锁, 公平锁]
+    content: ReentrantLock 支持公平锁、可中断获取、tryLock 超时、多个 Condition；synchronized 写法简单、由 JVM 优化、无需手动释放。没有高级需求优先 synchronized，避免忘记 unlock。
+  - id: java-conc-09
+    name: ThreadLocal 原理与泄漏
+    priority: 85
+    activation:
+      type: keyword
+      keys: [ThreadLocal, 内存泄漏, 线程池]
+    content: 每个线程持有 ThreadLocalMap，key 是 ThreadLocal 弱引用、value 强引用。线程池线程长期存活时，key 被回收而 value 残留导致泄漏，必须用 try-finally 调 remove。
+  - id: java-conc-10
+    name: CAS 与 ABA 问题
+    priority: 75
+    activation:
+      type: keyword
+      keys: [CAS, ABA, 原子类]
+    content: CAS 比较并交换，靠 CPU 指令保证原子性，失败自旋重试。自旋消耗 CPU；ABA 问题用版本号（AtomicStampedReference）解决。高竞争下用 LongAdder 分段累加更高效。
+  - id: java-conc-11
+    name: 死锁的四个条件与排查
+    priority: 80
+    activation:
+      type: keyword
+      keys: [死锁, 互斥, 循环等待]
+    content: 互斥、持有并等待、不可剥夺、循环等待四个条件同时满足才死锁。排查用 jstack 或 arthas thread -b；预防靠统一加锁顺序、tryLock 超时、缩小锁范围。
+  - id: java-conc-12
+    name: CompletableFuture 编排
+    priority: 75
+    activation:
+      type: keyword
+      keys: [CompletableFuture, 异步编排, 并行调用]
+    content: supplyAsync 提交异步任务，thenApply 转换、thenCompose 扁平化、thenCombine 合并两个结果、allOf 等全部完成。务必传自定义线程池，默认 ForkJoinPool 在阻塞场景不合适。
+  - id: java-conc-13
+    name: 线程间通信
+    priority: 65
+    activation:
+      type: keyword
+      keys: [wait notify, Condition, 线程通信]
+    content: wait 与 notify 必须持有同一把锁并在同步块内调用，wait 会释放锁；Condition 的 await 与 signal 更灵活，可多个条件队列。跨线程传数据也可用阻塞队列。
+  - id: java-conc-14
+    name: 虚拟线程
+    priority: 70
+    activation:
+      type: keyword
+      keys: [虚拟线程, Project Loom, 协程]
+    content: JDK 21 正式支持虚拟线程，由 JVM 调度、挂起代价低，适合大量阻塞式 IO。注意 synchronized 阻塞会钉住载体线程（JDK 21），IO 密集用 ReentrantLock 更稳；CPU 密集仍用平台线程池。
+  - id: java-conc-15
+    name: 并发容器选型
+    priority: 60
+    activation:
+      type: keyword
+      keys: [并发容器, BlockingQueue, 阻塞队列]
+    content: 高并发键值用 ConcurrentHashMap；读多写极少用 CopyOnWriteArrayList；生产消费用 ArrayBlockingQueue 或 LinkedBlockingQueue；需要优先级用 PriorityBlockingQueue；延迟任务用 DelayQueue。
+
+  # ---------------- Spring（15 条）----------------
+  - id: java-spring-01
+    name: IoC 与 DI
+    priority: 80
+    activation:
+      type: keyword
+      keys: [IoC, 依赖注入, 控制反转]
+    content: 对象的创建与依赖装配交给容器，业务只声明依赖。注入方式有构造器、设值、字段；构造器注入便于不可变与单测，字段注入最省事但不推荐在核心类使用。
+  - id: java-spring-02
+    name: Bean 生命周期
+    priority: 80
+    activation:
+      type: keyword
+      keys: [Bean 生命周期, 初始化, 后置处理器]
+    content: 实例化、属性填充、Aware 回调、BeanPostProcessor 前置、初始化方法（AfterPropertiesSet 或 init-method）、后置处理、使用、销毁。AOP 代理通常在 BeanPostProcessor 后置阶段生成。
+  - id: java-spring-03
+    name: 循环依赖与三级缓存
+    priority: 85
+    activation:
+      type: keyword
+      keys: [循环依赖, 三级缓存, 单例]
+    content: 单例的设值或字段注入靠三级缓存解决，分别是成品池、早期引用池、对象工厂。构造器注入、prototype 作用域、@Async 代理场景无法解决，会抛 BeanCurrentlyInCreationException。
+  - id: java-spring-04
+    name: AOP 与代理
+    priority: 85
+    activation:
+      type: keyword
+      keys: [AOP, 动态代理, CGLIB]
+    content: 有接口默认 JDK 动态代理，无接口用 CGLIB 生成子类；Spring Boot 2.x 默认直接 CGLIB。同类自调用不走代理导致切面失效，final 类或方法无法代理。
+  - id: java-spring-05
+    name: 事务失效场景
+    priority: 85
+    activation:
+      type: keyword
+      keys: [事务失效, Transactional, 回滚]
+    content: 自调用、非 public 方法、异常被吞、抛检查异常未配 rollbackFor、类未被 Spring 管理、多数据源未指定事务管理器、异步方法内调用，都会让 @Transactional 失效。
+  - id: java-spring-06
+    name: 事务传播行为
+    priority: 75
+    activation:
+      type: keyword
+      keys: [传播行为, REQUIRED, REQUIRES_NEW]
+    content: REQUIRED 加入当前事务，没有就新建；REQUIRES_NEW 挂起外层新建事务，适合日志留痕；NESTED 用 savepoint 支持局部回滚，仅部分事务管理器支持；SUPPORTS 与 NOT_SUPPORTED 按有无事务区分。
+  - id: java-spring-07
+    name: Spring MVC 请求流程
+    priority: 75
+    activation:
+      type: keyword
+      keys: [Spring MVC, DispatcherServlet, 请求流程]
+    content: 请求先到 DispatcherServlet，查 HandlerMapping 得到处理器与拦截器链，经 HandlerAdapter 调用，返回值由 HandlerMethodReturnValueHandler 处理，异常走 HandlerExceptionResolver。
+  - id: java-spring-08
+    name: 拦截器与过滤器
+    priority: 65
+    activation:
+      type: keyword
+      keys: [拦截器, 过滤器, Filter]
+    content: Filter 属于 Servlet 规范，在 DispatcherServlet 前后；Interceptor 属于 Spring MVC，能拿到 Handler 与 ModelAndView。鉴权、日志、跨域三者都可做，选择看是否需要 Spring 上下文。
+  - id: java-spring-09
+    name: 自动配置原理
+    priority: 75
+    activation:
+      type: keyword
+      keys: [自动配置, Spring Boot, 条件注解]
+    content: 启动类上的 EnableAutoConfiguration 通过 spring.factories 或 AutoConfiguration.imports 导入配置类，再按 ConditionalOnClass、ConditionalOnMissingBean 等条件筛选。自定义 starter 就是打包配置类加条件注解。
+  - id: java-spring-10
+    name: 全局异常处理
+    priority: 70
+    activation:
+      type: keyword
+      keys: [ControllerAdvice, 全局异常, 统一响应]
+    content: ControllerAdvice 配合 ExceptionHandler 把异常转成统一响应体；业务异常映射 4xx，系统异常映射 500 并记日志；不要向前端返回堆栈，必要时在日志里带 traceId。
+  - id: java-spring-11
+    name: 参数校验
+    priority: 65
+    activation:
+      type: keyword
+      keys: [参数校验, Valid, 校验注解]
+    content: 请求体用 @Valid 加 Bean Validation 注解，方法参数用 @Validated 加约束；校验失败抛 MethodArgumentNotValidException，用全局异常处理转成友好提示；分组校验用于新增与更新差异。
+  - id: java-spring-12
+    name: Spring 事务与数据库隔离
+    priority: 65
+    activation:
+      type: keyword
+      keys: [隔离级别, 事务隔离, 脏读]
+    content: 读未提交、读已提交、可重复读、串行化。MySQL 默认可重复读，靠 MVCC 与间隙锁减少幻读。Spring 的 isolation 只是转发给数据库，跨库无法统一。
+  - id: java-spring-13
+    name: Bean 作用域与线程安全
+    priority: 70
+    activation:
+      type: keyword
+      keys: [Bean 作用域, 单例, 线程安全]
+    content: 默认单例，容器内只有一个实例，成员变量被多线程共享，必须无状态或线程安全。prototype 每次获取新实例；request 与 session 作用域仅 Web 环境可用。
+  - id: java-spring-14
+    name: 定时任务与异步
+    priority: 65
+    activation:
+      type: keyword
+      keys: [Scheduled, Async, 异步任务]
+    content: 定时任务用 Scheduled 注解默认单线程，任务互相阻塞，需要配置线程池；异步用 Async 注解，必须走代理调用，同类自调用不生效，返回值用 CompletableFuture 并指定线程池。
+  - id: java-spring-15
+    name: 配置加载优先级
+    priority: 60
+    activation:
+      type: keyword
+      keys: [配置优先级, profile, 配置中心]
+    content: 命令行参数高于系统环境变量，高于 application-{profile}，高于 application。密钥只从环境变量读，本地用 local profile 且加入忽略列表，不要提交到仓库。
+
+  # ---------------- MySQL（15 条）----------------
+  - id: java-mysql-01
+    name: B 加树索引
+    priority: 85
+    activation:
+      type: keyword
+      keys: [B加树, 索引结构, InnoDB]
+    content: InnoDB 用 B 加树，非叶子节点只存索引、叶子节点存数据并用双向链表相连，适合范围查询与排序。三层高度可存千万级数据，通常两到三次磁盘 IO。
+  - id: java-mysql-02
+    name: 聚簇索引与二级索引
+    priority: 80
+    activation:
+      type: keyword
+      keys: [聚簇索引, 二级索引, 回表]
+    content: 主键索引的叶子节点是整行数据；二级索引叶子存主键值，查非索引列要回表。覆盖索引指查询列全在索引中，可避免回表，是常见的优化点。
+  - id: java-mysql-03
+    name: 最左前缀原则
+    priority: 85
+    activation:
+      type: keyword
+      keys: [最左前缀, 联合索引, 索引下推]
+    content: 联合索引 a b c 只有从 a 开始连续匹配才能用上后续列；范围查询后的列只能用于过滤不能用于排序。索引下推让不符合条件的记录在引擎层过滤，减少回表。
+  - id: java-mysql-04
+    name: 索引失效的写法
+    priority: 80
+    activation:
+      type: keyword
+      keys: [索引失效, 隐式转换, 模糊查询]
+    content: 索引列做函数或运算、隐式类型转换、前缀模糊查询、不满足最左前缀、or 连接非索引列、优化器判断回表成本过高，都会导致索引失效。用 explain 的 type 与 key 确认。
+  - id: java-mysql-05
+    name: explain 关键字段
+    priority: 80
+    activation:
+      type: keyword
+      keys: [explain, 执行计划, 慢查询]
+    content: type 从好到差依次是 system、const、eq_ref、ref、range、index、ALL；key 是实际使用的索引；rows 是估算扫描行数；Extra 出现 Using filesort 或 Using temporary 需要优化。
+  - id: java-mysql-06
+    name: 事务隔离级别
+    priority: 75
+    activation:
+      type: keyword
+      keys: [隔离级别, 幻读, 不可重复读]
+    content: 读未提交有脏读；读已提交解决脏读；可重复读解决不可重复读，MySQL 默认；串行化解决幻读但并发差。InnoDB 在可重复读下用间隙锁与 MVCC 减少幻读。
+  - id: java-mysql-07
+    name: MVCC 与版本链
+    priority: 85
+    activation:
+      type: keyword
+      keys: [MVCC, 版本链, ReadView]
+    content: 每行有隐藏事务 id 与回滚指针，undo log 串成版本链；ReadView 记录活跃事务，判断哪个版本可见。读已提交每次查询新建 ReadView，可重复读复用第一次的。
+  - id: java-mysql-08
+    name: 间隙锁与临键锁
+    priority: 75
+    activation:
+      type: keyword
+      keys: [间隙锁, 临键锁, 锁范围]
+    content: 临键锁等于记录锁加间隙锁，锁住记录与其前面的间隙，用于防幻读。等值命中唯一索引时退化为记录锁；范围查询或非唯一索引会锁更大范围，容易造成锁等待。
+  - id: java-mysql-09
+    name: 日志体系
+    priority: 70
+    activation:
+      type: keyword
+      keys: [redo log, undo log, binlog]
+    content: redo log 保证崩溃恢复与持久性，循环写；undo log 支持回滚与 MVCC；binlog 记录逻辑变更，用于复制与恢复。两阶段提交保证 redo 与 binlog 一致。
+  - id: java-mysql-10
+    name: 深分页优化
+    priority: 75
+    activation:
+      type: keyword
+      keys: [深分页, limit 优化, 游标]
+    content: limit 100000 加 20 会扫描前十万行再丢弃。优化方式有延迟关联（先用覆盖索引取主键再回表）、游标法按上一页最后一条的排序键过滤、或限制可翻页深度。
+  - id: java-mysql-11
+    name: 慢 SQL 定位
+    priority: 75
+    activation:
+      type: keyword
+      keys: [慢查询日志, 慢 SQL, 定位]
+    content: 开 slow_query_log 并设 long_query_time，用 mysqldumpslow 或 pt-query-digest 聚合；对高频 SQL 逐个 explain；关注扫描行数与临时表，不要只看单次耗时。
+  - id: java-mysql-12
+    name: 表设计规范
+    priority: 65
+    activation:
+      type: keyword
+      keys: [表设计, 主键, 范式]
+    content: 主键用自增或雪花 id，避免频繁页分裂；金额用 decimal；状态用 tinyint 加字典；字段尽量 not null 并给默认值；按查询建索引，避免冗余与过长的联合索引。
+  - id: java-mysql-13
+    name: 分库分表
+    priority: 65
+    activation:
+      type: keyword
+      keys: [分库分表, 水平拆分, 分片键]
+    content: 单表数据量过大时先考虑归档与分区，仍不够再水平拆分。分片键要选查询必带且分布均匀的字段；跨分片查询、分页、聚合会变复杂，需评估成本。
+  - id: java-mysql-14
+    name: 主从复制与延迟
+    priority: 65
+    activation:
+      type: keyword
+      keys: [主从复制, 主从延迟, 读写分离]
+    content: 主库写 binlog，从库 IO 线程拉取、SQL 线程回放。大事务、无主键更新、从库压力大会导致延迟；读写分离后「刚写就读」可能读不到，用强制走主库或半同步缓解。
+  - id: java-mysql-15
+    name: 连接池与事务提交
+    priority: 60
+    activation:
+      type: keyword
+      keys: [连接池, 事务, 连接泄漏]
+    content: 连接池要限制最大连接数、设置获取超时与空闲回收；事务未提交或异常后未关闭会占住连接；长事务还拖长 undo 保留时间。监控活跃连接数与等待数。
+
+  # ---------------- Redis（12 条）----------------
+  - id: java-redis-01
+    name: Redis 为什么快
+    priority: 75
+    activation:
+      type: keyword
+      keys: [Redis, 单线程, 高性能]
+    content: 纯内存操作、单线程避免锁竞争与上下文切换、IO 多路复用、高效数据结构。命令执行是单线程，网络 IO 在 6.0 后可多线程。慢命令会阻塞所有请求。
+  - id: java-redis-02
+    name: 缓存穿透
+    priority: 80
+    activation:
+      type: keyword
+      keys: [缓存穿透, 布隆过滤器, 空值缓存]
+    content: 查询数据库中不存在的数据，缓存永远不命中，请求全打到库。方案是缓存空值并设短过期，或用布隆过滤器提前拦截。注意布隆过滤器有误判且不易删除。
+  - id: java-redis-03
+    name: 缓存击穿
+    priority: 80
+    activation:
+      type: keyword
+      keys: [缓存击穿, 热点 key, 互斥重建]
+    content: 热点 key 过期瞬间大量请求同时回源。方案是互斥锁重建（只放一个线程查库）、逻辑过期异步更新、或热点 key 永不过期加后台刷新。
+  - id: java-redis-04
+    name: 缓存雪崩
+    priority: 80
+    activation:
+      type: keyword
+      keys: [缓存雪崩, 过期时间, 降级]
+    content: 大量 key 同时失效或 Redis 整体不可用导致流量压到数据库。方案是过期时间加随机、多级缓存、限流降级、集群高可用。
+  - id: java-redis-05
+    name: 持久化 RDB 与 AOF
+    priority: 70
+    activation:
+      type: keyword
+      keys: [RDB, AOF, 混合持久化]
+    content: RDB 是快照，文件小、恢复快但可能丢较多数据；AOF 追加写命令，everysec 最多丢一秒，文件大恢复慢。混合持久化结合两者，重启更快且丢数据少。
+  - id: java-redis-06
+    name: 分布式锁实现
+    priority: 85
+    activation:
+      type: keyword
+      keys: [分布式锁, setnx, 看门狗]
+    content: 加锁用 SET key value NX PX 保证原子，value 放唯一标识；释放用 Lua 比较后删除；业务可能超时用看门狗续期。主从切换可能丢锁，强一致场景需评估。
+  - id: java-redis-07
+    name: Redis 数据结构
+    priority: 70
+    activation:
+      type: keyword
+      keys: [Redis 数据结构, zset, hash]
+    content: string 做缓存与计数；hash 存对象字段；list 做队列；set 做去重与交并集；zset 做排行榜与延时队列；bitmap 做签到；HyperLogLog 做基数统计。
+  - id: java-redis-08
+    name: 过期与淘汰策略
+    priority: 70
+    activation:
+      type: keyword
+      keys: [过期策略, 淘汰策略, maxmemory]
+    content: 过期用惰性删除加定期抽样删除。内存满时按 maxmemory-policy 淘汰，常用 allkeys-lru 与 volatile-lru。缓存与持久数据不要共用实例，避免被被动淘汰。
+  - id: java-redis-09
+    name: 大 key 与热 key
+    priority: 70
+    activation:
+      type: keyword
+      keys: [大 key, 热 key, 拆分]
+    content: 大 key 会阻塞网络与删除，拆成多个小 key 或分页；热 key 用本地缓存、副本、读写分离分散。用 scan 与慢日志发现，不要在生产用 keys。
+  - id: java-redis-10
+    name: Redis 集群与主从
+    priority: 65
+    activation:
+      type: keyword
+      keys: [Redis 集群, 哨兵, 主从]
+    content: 主从做读写分离与备份，哨兵负责故障转移，集群用哈希槽分片到 16384 个槽。集群模式下多 key 操作要求同槽，用 hash tag 控制。
+  - id: java-redis-11
+    name: 缓存一致性方案
+    priority: 80
+    activation:
+      type: keyword
+      keys: [缓存一致性, 删缓存, 延迟双删]
+    content: 常用 Cache Aside：更新库后删缓存，删除失败重试或发消息补偿；延迟双删用于缓解主从延迟导致的旧值回填。强一致场景读写加锁或直接读库。
+  - id: java-redis-12
+    name: Lua 脚本使用
+    priority: 65
+    activation:
+      type: keyword
+      keys: [Lua, 原子操作, 脚本]
+    content: Lua 脚本在 Redis 中原子执行，常用于库存扣减、分布式锁释放、限流。脚本要短、避免随机与时间函数，key 数量固定以便集群路由。
+
+  # ---------------- 消息队列（8 条）----------------
+  - id: java-mq-01
+    name: 消息不丢三环节
+    priority: 80
+    activation:
+      type: keyword
+      keys: [消息不丢, 确认机制, 持久化]
+    content: 生产端用同步发送或确认机制；Broker 持久化并做副本；消费端手动 ack，业务处理成功后再确认。三段都要兜，任何一段放松都可能丢消息。
+  - id: java-mq-02
+    name: 消费幂等
+    priority: 80
+    activation:
+      type: keyword
+      keys: [幂等, 重复消费, 去重表]
+    content: 消息至少投递一次，消费端必须幂等。用业务唯一键建去重表或 Redis setnx 占位，或用状态机只允许单向流转。去重记录要有清理策略。
+  - id: java-mq-03
+    name: 消息顺序
+    priority: 65
+    activation:
+      type: keyword
+      keys: [顺序消息, 分区, 消息积压]
+    content: 只有同一分区或队列内有序。按业务键路由到同一分区，消费端单线程或按 key 顺序处理。全局顺序代价高，通常只在局部需要。
+  - id: java-mq-04
+    name: 消息积压处理
+    priority: 70
+    activation:
+      type: keyword
+      keys: [消息积压, 扩容消费者, 死信队列]
+    content: 先看消费者是否卡在某个消息或下游；能扩分区与消费者就扩；临时把消息转存到新 topic 再扩容消费；长期靠监控与容量规划，不能只靠临时脚本。
+  - id: java-mq-05
+    name: 事务消息
+    priority: 65
+    activation:
+      type: keyword
+      keys: [事务消息, 本地消息表, 最终一致]
+    content: RocketMQ 事务消息用半消息加回查保证本地事务与发送一致；其他 MQ 常用本地消息表加定时补偿。目标都是最终一致，不是强一致。
+  - id: java-mq-06
+    name: 延迟消息
+    priority: 60
+    activation:
+      type: keyword
+      keys: [延迟消息, 定时任务, 订单超时]
+    content: 订单超时取消可用 MQ 延迟消息、Redis zset 或定时扫表。延迟消息要求精度时注意消息队列的延迟等级限制，扫表要注意索引与扫描范围。
+  - id: java-mq-07
+    name: 死信队列
+    priority: 60
+    activation:
+      type: keyword
+      keys: [死信队列, 重试, 补偿]
+    content: 消费失败重试多次后进死信队列，避免无限重试阻塞。死信要有告警与人工或自动补偿入口，定期清理，不要当成垃圾桶。
+  - id: java-mq-08
+    name: Kafka 与 RabbitMQ 选型
+    priority: 60
+    activation:
+      type: keyword
+      keys: [Kafka, RabbitMQ, 选型]
+    content: Kafka 吞吐高、分区顺序、适合日志与流处理；RabbitMQ 路由灵活、延迟低、适合业务消息。选型看吞吐、延迟、路由复杂度与团队运维能力。
+
+  # ---------------- 微服务与架构（8 条）----------------
+  - id: java-micro-01
+    name: 服务拆分原则
+    priority: 75
+    activation:
+      type: keyword
+      keys: [微服务拆分, 服务边界, 领域驱动]
+    content: 按业务能力与数据所有权拆，先拆变化频率高、可独立负责的模块；一服务一库，跨服务走接口而不是共享表；拆之前先补监控、日志与链路追踪。
+  - id: java-micro-02
+    name: 服务间通信
+    priority: 65
+    activation:
+      type: keyword
+      keys: [RPC, Feign, 服务调用]
+    content: 同步调用简单但有耦合与级联故障风险，要配超时、重试与熔断；异步用消息解耦、削峰。接口要版本化，字段增减保持兼容。
+  - id: java-micro-03
+    name: 分布式事务
+    priority: 70
+    activation:
+      type: keyword
+      keys: [分布式事务, TCC, Saga]
+    content: 强一致用 2PC 代价大；常用最终一致方案有本地消息表、事务消息、TCC、Saga。选择看业务能否接受中间状态，以及补偿逻辑是否可写。
+  - id: java-micro-04
+    name: 熔断限流降级
+    priority: 70
+    activation:
+      type: keyword
+      keys: [熔断, 限流, 降级]
+    content: 限流保护自身（令牌桶、漏桶、滑动窗口），熔断保护调用方（失败率阈值打开短路），降级给兜底响应。三者配合，避免故障沿调用链放大。
+  - id: java-micro-05
+    name: 链路追踪
+    priority: 65
+    activation:
+      type: keyword
+      keys: [链路追踪, traceId, 可观测]
+    content: 入口生成 traceId 并通过请求头透传，日志与 RPC 都带上；用 SkyWalking 或 Zipkin 看调用链与耗时分布。没有 traceId 的日志在微服务里基本不可用。
+  - id: java-micro-06
+    name: 幂等与重试
+    priority: 65
+    activation:
+      type: keyword
+      keys: [重试, 幂等设计, 退避]
+    content: 重试只对可重试错误生效，必须指数退避加抖动，并设上限；被调用方接口要幂等，否则重试会制造重复副作用。
+  - id: java-micro-07
+    name: 配置中心与注册中心
+    priority: 60
+    activation:
+      type: keyword
+      keys: [注册中心, 配置中心, Nacos]
+    content: 注册中心维护实例列表与健康状态，配置中心管理动态配置。两者都要求高可用，客户端要有本地缓存，避免中心挂掉后全站不可用。
+  - id: java-micro-08
+    name: 网关职责
+    priority: 60
+    activation:
+      type: keyword
+      keys: [网关, 鉴权, 路由]
+    content: 统一入口做路由、鉴权、限流、日志、灰度与协议转换。网关不应承载业务逻辑，否则会变成新的单体。

@@ -50,6 +50,16 @@ public final class Worldbook {
         static Activation keyword(List<String> keys) {
             return new Activation(false, keys);
         }
+
+        /** 是否常驻注入（{@code activation: {type: always}}）。 */
+        public boolean isAlways() {
+            return always;
+        }
+
+        /** keyword 激活的关键词列表；always 条目为空列表。 */
+        public List<String> keys() {
+            return List.copyOf(keys);
+        }
     }
 
     /** 单条世界书条目。 */
@@ -69,6 +79,30 @@ public final class Worldbook {
             this.activation = activation;
             this.content = content;
         }
+
+        public String id() {
+            return id;
+        }
+
+        public String name() {
+            return name;
+        }
+
+        public boolean enabled() {
+            return enabled;
+        }
+
+        public int priority() {
+            return priority;
+        }
+
+        public Activation activation() {
+            return activation;
+        }
+
+        public String content() {
+            return content;
+        }
     }
 
     private final String name;
@@ -77,6 +111,16 @@ public final class Worldbook {
     private Worldbook(String name, List<Entry> entries) {
         this.name = name;
         this.entries = entries;
+    }
+
+    /** 书名（YAML 顶层 {@code name}，可为空）。 */
+    public String name() {
+        return name;
+    }
+
+    /** 全部条目（不可变副本），供入库/展示读取；注入逻辑仍走 {@link #inject}。 */
+    public List<Entry> entries() {
+        return List.copyOf(entries);
     }
 
     /**

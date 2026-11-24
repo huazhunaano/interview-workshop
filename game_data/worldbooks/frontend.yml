@@ -1,0 +1,719 @@
+name: Web 前端岗位知识库
+description: Web 前端面试常用知识点，共 100 条，按关键词命中注入（issue #1 的世界书 / 岗位知识库）。
+job_code: frontend
+entries:
+  # ---------------- JavaScript（18 条）----------------
+  - id: fe-js-01
+    name: 事件循环
+    priority: 90
+    activation:
+      type: keyword
+      keys: [事件循环, 宏任务, 微任务]
+    content: 执行同步代码后清空微任务队列，再取一个宏任务，如此循环。Promise 回调、queueMicrotask、MutationObserver 是微任务；setTimeout、I/O、UI 渲染属于宏任务。
+  - id: fe-js-02
+    name: 闭包
+    priority: 85
+    activation:
+      type: keyword
+      keys: [闭包, 作用域链, 内存泄漏]
+    content: 函数与其定义时的词法环境组合成闭包，内部函数可访问外部变量。常见用途是私有变量、防抖节流、函数工厂。长期持有大对象或 DOM 会导致泄漏，要显式解除引用。
+  - id: fe-js-03
+    name: this 指向
+    priority: 85
+    activation:
+      type: keyword
+      keys: [this, 绑定规则, 箭头函数]
+    content: 默认绑定（严格模式为 undefined）、隐式绑定（obj.fn）、显式绑定（call、apply、bind）、new 绑定。箭头函数没有自己的 this，取定义处外层的 this，且无法被 call 改变。
+  - id: fe-js-04
+    name: 原型与原型链
+    priority: 85
+    activation:
+      type: keyword
+      keys: [原型链, prototype, 继承]
+    content: 实例的 __proto__ 指向构造函数的 prototype，属性查找沿链向上直到 null。instanceof 沿原型链判断。class 的 extends 本质仍是原型链，super 调用父构造器。
+  - id: fe-js-05
+    name: 防抖与节流
+    priority: 80
+    activation:
+      type: keyword
+      keys: [防抖, 节流, 性能优化]
+    content: 防抖是停止触发后延迟执行一次，适合搜索联想与 resize；节流是固定间隔最多执行一次，适合滚动与拖拽。防抖可加立即执行选项，节流可用时间戳或定时器实现。
+  - id: fe-js-06
+    name: 深拷贝与浅拷贝
+    priority: 75
+    activation:
+      type: keyword
+      keys: [深拷贝, 浅拷贝, structuredClone]
+    content: 浅拷贝只复制第一层（扩展运算符、Object.assign、slice）；深拷贝要递归处理对象、数组、Map、Set、循环引用。能用 structuredClone 就用，函数与 Symbol 无法复制；JSON 方案会丢 undefined 与日期。
+  - id: fe-js-07
+    name: Promise 与 async await
+    priority: 80
+    activation:
+      type: keyword
+      keys: [Promise, async await, 异步]
+    content: Promise 三态且不可逆；then 返回新 Promise，可链式；catch 捕获链上异常；finally 不做转换。async 函数返回 Promise，await 等待结果，try catch 捕获 rejection，并行用 Promise.all。
+  - id: fe-js-08
+    name: Promise 并发控制
+    priority: 70
+    activation:
+      type: keyword
+      keys: [Promise.all, allSettled, 并发控制]
+    content: all 要求全部成功，任一失败立即 reject；allSettled 等全部结束并返回状态；race 取最快；any 取第一个成功。限制并发要自己写池子或分批，避免瞬间打满接口。
+  - id: fe-js-09
+    name: 变量声明与暂时性死区
+    priority: 75
+    activation:
+      type: keyword
+      keys: [let const, 暂时性死区, 提升]
+    content: var 有变量提升、函数作用域、可重复声明；let 与 const 是块级作用域，声明前访问抛暂时性死区错误。const 只保证绑定不变，对象内容仍可改。
+  - id: fe-js-10
+    name: 数据类型与判断
+    priority: 75
+    activation:
+      type: keyword
+      keys: [数据类型, typeof, instanceof]
+    content: 七种原始类型加 Object。typeof 对 null 返回 object、对函数返回 function；数组用 Array.isArray；跨 iframe 时 instanceof 失效；精确判断可用 Object.prototype.toString。
+  - id: fe-js-11
+    name: 相等比较
+    priority: 70
+    activation:
+      type: keyword
+      keys: [相等比较, 类型转换, NaN]
+    content: 双等号会做类型转换，null 与 undefined 互等，对象与原始值比较会尝试转换；三等号不转换类型。NaN 不等于自身，用 Number.isNaN 判断；Object.is 区分正负零与 NaN。
+  - id: fe-js-12
+    name: 数组常用方法
+    priority: 65
+    activation:
+      type: keyword
+      keys: [数组方法, map, reduce]
+    content: map、filter、reduce 不改变原数组，forEach 无返回值；reduce 可实现分组与求和；sort 直接改原数组且默认按字符串排序，数字要传比较函数；find 与 some 提前终止。
+  - id: fe-js-13
+    name: 事件流与委托
+    priority: 75
+    activation:
+      type: keyword
+      keys: [事件冒泡, 事件委托, 捕获]
+    content: 事件流分捕获、目标、冒泡三阶段。事件委托利用冒泡把监听挂在父节点，适合动态列表，减少监听数量；需要阻止冒泡用 stopPropagation，阻止默认行为用 preventDefault。
+  - id: fe-js-14
+    name: 模块化演进
+    priority: 65
+    activation:
+      type: keyword
+      keys: [模块化, CommonJS, ESM]
+    content: CommonJS 是运行时 require、值的拷贝；ESM 是静态结构、活绑定、支持 tree-shaking；AMD 与 UMD 是历史方案。浏览器原生 ESM 需要 type 为 module，且走 HTTP 协议。
+  - id: fe-js-15
+    name: 内存管理与回收
+    priority: 70
+    activation:
+      type: keyword
+      keys: [垃圾回收, 内存管理, 标记清除]
+    content: V8 用分代回收，新生代 Scavenge 复制，老年代标记清除加整理。内存泄漏常见于全局变量、未清理定时器与监听、闭包持有 DOM、缓存无上限。
+  - id: fe-js-16
+    name: 柯里化与组合
+    priority: 60
+    activation:
+      type: keyword
+      keys: [柯里化, 高阶函数, 组合]
+    content: 柯里化把多参函数转成逐次接收单个参数，便于复用与偏函数；组合 compose 把多个函数串成数据流。实现依赖闭包与 apply，注意 this 与参数顺序。
+  - id: fe-js-17
+    name: Proxy 与 Reflect
+    priority: 70
+    activation:
+      type: keyword
+      keys: [Proxy, Reflect, 响应式]
+    content: Proxy 拦截对象操作（get、set、deleteProperty 等），Reflect 提供对应的默认行为。Vue 3 响应式基于 Proxy 加 Reflect；Proxy 无法代理原始值，且不支持低版本浏览器。
+  - id: fe-js-18
+    name: 生成器与迭代器
+    priority: 60
+    activation:
+      type: keyword
+      keys: [生成器, 迭代器, yield]
+    content: 可迭代对象实现 Symbol.iterator 返回迭代器；生成器函数用 yield 暂停并可双向传值，用 next 推进。常用于惰性序列、异步流程控制，async await 可看作其语法糖。
+
+  # ---------------- TypeScript（8 条）----------------
+  - id: fe-ts-01
+    name: interface 与 type
+    priority: 75
+    activation:
+      type: keyword
+      keys: [interface, type, 类型别名]
+    content: 两者大多可互换；interface 可声明合并、适合描述对象契约；type 能表达联合、交叉、映射、条件与模板字面量类型。需要声明合并或扩展时用 interface。
+  - id: fe-ts-02
+    name: 泛型
+    priority: 80
+    activation:
+      type: keyword
+      keys: [泛型, 类型参数, 约束]
+    content: 泛型把类型参数化，调用时推断或显式指定。用 extends 约束可访问的属性，用默认值提供兜底。泛型应保持参数间有关系，否则不如直接用具体类型。
+  - id: fe-ts-03
+    name: 常用工具类型
+    priority: 75
+    activation:
+      type: keyword
+      keys: [工具类型, Partial, Pick]
+    content: Partial 全可选、Required 全必填、Readonly 只读、Pick 取子集、Omit 排除、Record 构造映射、ReturnType 与 Parameters 取函数信息。它们基于映射类型与条件类型实现。
+  - id: fe-ts-04
+    name: 联合类型与类型收窄
+    priority: 75
+    activation:
+      type: keyword
+      keys: [联合类型, 类型收窄, 判别联合]
+    content: 用 typeof、in、instanceof、字面量判别字段收窄联合类型；可辨识联合用共同的 kind 字段配合 switch，保证穷尽性检查。断言 as 会跳过检查，尽量少用。
+  - id: fe-ts-05
+    name: 类型断言与类型守卫
+    priority: 65
+    activation:
+      type: keyword
+      keys: [类型守卫, 类型断言, is]
+    content: 类型守卫是返回值为 参数 is 类型 的函数，调用后自动收窄；断言只影响编译期，不改变运行时。运行时校验仍要靠代码，接口数据要显式校验。
+  - id: fe-ts-06
+    name: 条件类型与 infer
+    priority: 70
+    activation:
+      type: keyword
+      keys: [条件类型, infer, 类型推导]
+    content: 条件类型形如 T extends U 问号 X 冒号 Y，配合 infer 在类型中提取子类型，常用于提取 Promise 结果、函数参数、数组元素。分布式条件类型在裸类型参数上会对联合逐个应用。
+  - id: fe-ts-07
+    name: 类型声明与模块
+    priority: 65
+    activation:
+      type: keyword
+      keys: [d.ts, 类型声明, 模块扩展]
+    content: 第三方无类型包在 d.ts 里声明 declare module；全局类型用 declare global；类型声明只参与编译，不产出运行时代码。开启严格模式能提前发现 null 与隐式 any。
+  - id: fe-ts-08
+    name: 泛型约束实战
+    priority: 60
+    activation:
+      type: keyword
+      keys: [keyof, 索引类型, 泛型约束]
+    content: keyof T 取键的联合，T 加方括号键名取属性类型，配合 extends 约束保证传入的键存在。写通用函数时用这种模式保证调用方传错键会报错。
+
+  # ---------------- Vue（18 条）----------------
+  - id: fe-vue-01
+    name: Vue 3 响应式原理
+    priority: 90
+    activation:
+      type: keyword
+      keys: [Vue 响应式, Proxy, 依赖收集]
+    content: reactive 用 Proxy 代理对象，get 时收集依赖（effect 与属性对应），set 时触发对应 effect。ref 用对象包裹值并走同样的依赖收集，模板中自动解包。
+  - id: fe-vue-02
+    name: ref 与 reactive
+    priority: 85
+    activation:
+      type: keyword
+      keys: [ref, reactive, 响应式丢失]
+    content: 基本类型用 ref，对象两者皆可。解构 reactive 对象会丢失响应式，需 toRefs；整体替换 reactive 对象会断开引用。ref 通过 value 访问，模板里自动解包。
+  - id: fe-vue-03
+    name: 计算属性与侦听器
+    priority: 80
+    activation:
+      type: keyword
+      keys: [computed, watch, watchEffect]
+    content: computed 有缓存，依赖不变不重算，适合派生数据；watch 显式指定源并拿到新旧值，适合副作用；watchEffect 自动收集依赖且立即执行。不要在 computed 里做副作用。
+  - id: fe-vue-04
+    name: 生命周期
+    priority: 75
+    activation:
+      type: keyword
+      keys: [生命周期, onMounted, onUnmounted]
+    content: 组合式 API 用 onBeforeMount、onMounted、onBeforeUpdate、onUpdated、onBeforeUnmount、onUnmounted。请求一般放 onMounted，定时器与监听在 onUnmounted 清理。
+  - id: fe-vue-05
+    name: nextTick
+    priority: 80
+    activation:
+      type: keyword
+      keys: [nextTick, DOM 更新, 异步更新]
+    content: 数据变更不会立即更新 DOM，而是进入微任务队列批量 patch。nextTick 的回调在这次更新后执行，需要读取新 DOM 尺寸或聚焦时用 await nextTick。
+  - id: fe-vue-06
+    name: 组件通信
+    priority: 80
+    activation:
+      type: keyword
+      keys: [props, emit, provide inject]
+    content: 父传子用 props，子传父用 emit；跨层用 provide 与 inject；全局用 Pinia。避免用事件总线造成隐式依赖。props 不要直接修改，用本地副本或 emit 通知父级。
+  - id: fe-vue-07
+    name: v-model 原理
+    priority: 70
+    activation:
+      type: keyword
+      keys: [v-model, 双向绑定, modelValue]
+    content: 组件上的 v-model 是 modelValue 属性加 update:modelValue 事件的语法糖；可传参数实现多个 v-model；修饰符通过 modelModifiers 传入，如 lazy、number。
+  - id: fe-vue-08
+    name: 插槽
+    priority: 70
+    activation:
+      type: keyword
+      keys: [插槽, slot, 作用域插槽]
+    content: 默认插槽放主体内容，具名插槽区分区域，作用域插槽把子组件数据暴露给父级模板。插槽内容在父组件作用域编译，所以能访问父级数据。
+  - id: fe-vue-09
+    name: 路由与导航守卫
+    priority: 75
+    activation:
+      type: keyword
+      keys: [Vue Router, 路由守卫, 动态路由]
+    content: 全局有 beforeEach、beforeResolve、afterEach；组件内有 beforeRouteEnter 等。权限校验放在全局守卫，需先取用户权限再放行；动态 addRoute 后刷新会丢失，要重新注册。
+  - id: fe-vue-10
+    name: keep-alive
+    priority: 70
+    activation:
+      type: keyword
+      keys: [keep-alive, 缓存组件, activated]
+    content: keep-alive 缓存组件实例，切换时不销毁，用 activated 与 deactivated 感知进出。可配 include 与 exclude。缓存过多会占内存，要按需清理。
+  - id: fe-vue-11
+    name: 虚拟 DOM 与 diff
+    priority: 75
+    activation:
+      type: keyword
+      keys: [虚拟 DOM, diff, patch]
+    content: 用 JS 对象描述真实结构，更新时比对新旧树只改差异。Vue 3 编译时做静态提升与 patchFlag，运行时只比较动态部分。key 要稳定唯一，用索引当 key 会导致状态错位。
+  - id: fe-vue-12
+    name: 组合式函数
+    priority: 70
+    activation:
+      type: keyword
+      keys: [composable, 组合式 API, 复用逻辑]
+    content: 把有状态的逻辑抽成 useXxx 函数，内部用 ref 与生命周期，返回响应式数据与方法。相比 mixin，来源清晰、无命名冲突。注意在 setup 中同步调用。
+  - id: fe-vue-13
+    name: 自定义指令
+    priority: 60
+    activation:
+      type: keyword
+      keys: [自定义指令, directive, 指令钩子]
+    content: 指令有 created、beforeMount、mounted、beforeUpdate、updated、beforeUnmount、unmounted 钩子。适合操作 DOM 的横切逻辑，如聚焦、权限显隐、点击外部关闭。
+  - id: fe-vue-14
+    name: 状态管理 Pinia
+    priority: 70
+    activation:
+      type: keyword
+      keys: [Pinia, store, 状态管理]
+    content: 用 defineStore 声明 state、getters、actions，支持组合式写法。没有 mutations，模块天然独立；store 内部用 ref 与 computed。跨 store 调用直接引入另一个 store 使用。
+  - id: fe-vue-15
+    name: Vue 性能优化手段
+    priority: 75
+    activation:
+      type: keyword
+      keys: [Vue 性能优化, v-memo, shallowRef]
+    content: 大列表用虚拟滚动；不参与深层响应的数据用 shallowRef 或 markRaw；纯展示组件用 v-once 与 v-memo；按路由懒加载组件；避免在模板里做重计算；v-if 与 v-show 按切换频率选。
+  - id: fe-vue-16
+    name: teleport 与 Suspense
+    priority: 55
+    activation:
+      type: keyword
+      keys: [teleport, Suspense, 弹层]
+    content: teleport 把节点渲染到 body 等目标容器，解决弹层被父级 overflow 与层叠上下文裁剪；Suspense 等待异步组件或 async setup，配合 fallback 显示加载态。
+  - id: fe-vue-17
+    name: 组件库按需引入
+    priority: 60
+    activation:
+      type: keyword
+      keys: [按需引入, 组件库, tree-shaking]
+    content: 全量引入会让包体积膨胀。用 unplugin-vue-components 自动按需注册，或手动 import 组件与样式；检查构建产物确认未被引入的部分没有打进包。
+  - id: fe-vue-18
+    name: Vue 2 与 Vue 3 差异
+    priority: 65
+    activation:
+      type: keyword
+      keys: [Vue 2, Vue 3, 迁移]
+    content: Vue 3 用 Proxy 响应式、支持组合式 API、Fragment、Teleport、多根节点；v-model 语义变化；过滤器移除；生命周期改名。Vue 2 不再维护，新项目直接用 3。
+
+  # ---------------- 浏览器与网络（15 条）----------------
+  - id: fe-browser-01
+    name: 从 URL 到页面渲染
+    priority: 85
+    activation:
+      type: keyword
+      keys: [页面渲染, 输入 URL, 浏览器流程]
+    content: URL 解析与缓存检查、DNS、TCP 与 TLS、发请求、服务端响应、解析 HTML 建 DOM、CSS 建 CSSOM、布局、绘制、合成。同步脚本会阻塞解析，defer 与 async 改变执行时机。
+  - id: fe-browser-02
+    name: 强缓存与协商缓存
+    priority: 85
+    activation:
+      type: keyword
+      keys: [强缓存, 协商缓存, Cache-Control]
+    content: 强缓存由 Cache-Control 的 max-age 与 immutable 控制，命中不发请求；过期后带 ETag 或 Last-Modified 走协商，命中回 304。静态资源用内容哈希加长缓存，HTML 用 no-cache。
+  - id: fe-browser-03
+    name: 跨域与 CORS
+    priority: 85
+    activation:
+      type: keyword
+      keys: [跨域, CORS, 预检请求]
+    content: 同源策略限制协议、域名、端口不同的请求。非简单请求先发 OPTIONS 预检，服务端返回 Allow-Origin、Allow-Methods、Allow-Headers。带 cookie 时 Allow-Credentials 为 true 且 Origin 不能用通配符。
+  - id: fe-browser-04
+    name: 浏览器存储
+    priority: 75
+    activation:
+      type: keyword
+      keys: [Cookie, localStorage, IndexedDB]
+    content: Cookie 约 4KB 且随请求发送，适合会话凭证并设 HttpOnly；localStorage 约 5MB、长期留存、同步；sessionStorage 仅当前标签页；IndexedDB 容量大、异步、可建索引。
+  - id: fe-browser-05
+    name: 浏览器渲染流程
+    priority: 75
+    activation:
+      type: keyword
+      keys: [渲染流程, 布局, 绘制]
+    content: DOM 与 CSSOM 合成渲染树，布局计算几何位置，绘制生成图层，最后合成上屏。改变几何属性触发重排，只改颜色触发重绘，transform 与 opacity 可只走合成。
+  - id: fe-browser-06
+    name: 事件循环与渲染时机
+    priority: 75
+    activation:
+      type: keyword
+      keys: [渲染时机, requestAnimationFrame, 帧]
+    content: 浏览器每帧执行任务与微任务后，再判断是否渲染。requestAnimationFrame 在渲染前回调，适合动画；长任务会挤掉渲染导致掉帧，用 Performance 面板看长任务。
+  - id: fe-browser-07
+    name: HTTP 版本差异
+    priority: 70
+    activation:
+      type: keyword
+      keys: [HTTP2, HTTP3, 多路复用]
+    content: HTTP 1.1 有队头阻塞；HTTP 2 多路复用、头部压缩、服务端推送，仍受 TCP 丢包影响；HTTP 3 基于 QUIC 走 UDP，减少握手与丢包阻塞。升级要配合 CDN 与证书。
+  - id: fe-browser-08
+    name: 安全响应头
+    priority: 70
+    activation:
+      type: keyword
+      keys: [CSP, X-Frame-Options, 安全头]
+    content: CSP 限制脚本与资源来源；X-Frame-Options 或 frame-ancestors 防点击劫持；X-Content-Type-Options 禁止 MIME 嗅探；Strict-Transport-Security 强制 HTTPS。
+  - id: fe-browser-09
+    name: 浏览器进程模型
+    priority: 60
+    activation:
+      type: keyword
+      keys: [多进程, 渲染进程, 主线程]
+    content: 浏览器主进程、渲染进程、GPU 进程、网络进程分离，站点隔离让不同站不同渲染进程。JS 运行在渲染主线程，与样式计算和布局共享线程，所以长任务会卡交互。
+  - id: fe-browser-10
+    name: 页面可见性
+    priority: 55
+    activation:
+      type: keyword
+      keys: [visibilitychange, 页面隐藏, 节流]
+    content: 用 visibilitychange 判断页面是否可见，隐藏时暂停轮询与动画，减少无谓消耗；后台标签页定时器会被节流，不能依赖它的精确时间。
+  - id: fe-browser-11
+    name: 浏览器缓存位置
+    priority: 55
+    activation:
+      type: keyword
+      keys: [memory cache, disk cache, 缓存位置]
+    content: 依次查找内存缓存、Service Worker、磁盘缓存、推送缓存。内存缓存随页面关闭释放，磁盘缓存持久。强制刷新会跳过强缓存但仍可能用协商缓存。
+  - id: fe-browser-12
+    name: DNS 与连接复用
+    priority: 55
+    activation:
+      type: keyword
+      keys: [DNS, 连接复用, keep-alive]
+    content: DNS 解析耗时可预解析（dns-prefetch）；HTTP 1.1 用 keep-alive 复用连接，HTTP 2 共用一条连接多路复用。减少域名数量与提前建连都能降低首屏延迟。
+  - id: fe-browser-13
+    name: 前端路由原理
+    priority: 65
+    activation:
+      type: keyword
+      keys: [前端路由, history, hash]
+    content: hash 模式改 URL 片段不触发请求，监听 hashchange；history 模式用 pushState 与 popstate，需要服务端把未知路径回退到 index.html，否则刷新 404。
+  - id: fe-browser-14
+    name: Web Worker
+    priority: 60
+    activation:
+      type: keyword
+      keys: [Web Worker, 主线程, 多线程]
+    content: Worker 在独立线程执行脚本，通过 postMessage 通信，不能直接操作 DOM。适合大计算、解析大文件、复杂格式化；数据传递默认结构化克隆，大对象可考虑 transferable。
+  - id: fe-browser-15
+    name: Service Worker 与离线
+    priority: 55
+    activation:
+      type: keyword
+      keys: [Service Worker, 离线缓存, PWA]
+    content: Service Worker 拦截请求实现离线缓存与推送，生命周期独立于页面，必须 HTTPS。缓存策略要区分导航请求与静态资源，更新时要处理旧缓存版本。
+
+  # ---------------- CSS（15 条）----------------
+  - id: fe-css-01
+    name: 盒模型
+    priority: 80
+    activation:
+      type: keyword
+      keys: [盒模型, box-sizing, 边框]
+    content: 标准盒模型的 width 只含内容区；border-box 的 width 含 padding 与 border。项目里常用 box-sizing 为 border-box 统一计算方式，避免加 padding 撑破布局。
+  - id: fe-css-02
+    name: BFC
+    priority: 75
+    activation:
+      type: keyword
+      keys: [BFC, margin 塌陷, 清除浮动]
+    content: BFC 是独立渲染区域，内部布局不影响外部。可清除浮动、阻止 margin 合并、避免被浮动元素覆盖。触发方式有 overflow 非 visible、float、绝对定位、display 为 flow-root。
+  - id: fe-css-03
+    name: Flex 布局
+    priority: 80
+    activation:
+      type: keyword
+      keys: [Flex, flex 属性, 主轴]
+    content: 容器用 display flex 定义主轴方向与对齐；flex 是 grow、shrink、basis 的简写，flex 为 1 表示可放大可缩小且基准为 0。min-width 为 auto 会阻止收缩，需要显式设为 0。
+  - id: fe-css-04
+    name: Grid 布局
+    priority: 70
+    activation:
+      type: keyword
+      keys: [Grid, 网格布局, minmax]
+    content: Grid 是二维布局，用 grid-template-columns 与 rows 定义轨道，fr 分配剩余空间，minmax 与 auto-fit 实现自适应列。适合整页骨架与卡片墙，内部细节仍可用 Flex。
+  - id: fe-css-05
+    name: 层叠上下文
+    priority: 70
+    activation:
+      type: keyword
+      keys: [层叠上下文, z-index, 定位]
+    content: position 加 z-index、opacity 小于 1、transform、filter、flex 子项的 z-index 都会创建层叠上下文，内部层级不与外部直接比较。z-index 失效往往是因为父级形成了新的上下文。
+  - id: fe-css-06
+    name: 居中方案
+    priority: 75
+    activation:
+      type: keyword
+      keys: [居中, 水平垂直居中, 对齐]
+    content: Flex 的 align-items 加 justify-content 最通用；Grid 用 place-items；绝对定位加 transform 适合脱离文档流；单行文本用 line-height；多行文本可用 Grid 或 flex 配合 margin auto。
+  - id: fe-css-07
+    name: 响应式适配
+    priority: 70
+    activation:
+      type: keyword
+      keys: [响应式, 媒体查询, 移动端适配]
+    content: 用视口 meta 加媒体查询做断点，布局用 Flex 与 Grid 自适应，图片用 srcset。rem 或 vw 按设计稿等比缩放，注意不要混用多套方案。交互热区不小于 44px。
+  - id: fe-css-08
+    name: 移动端 1px 边框
+    priority: 60
+    activation:
+      type: keyword
+      keys: [1px 边框, 高清屏, dpr]
+    content: 高清屏 dpr 大于 1 时 1px 会显粗。方案有 transform scale 缩小伪元素、background 渐变、box-shadow 或 viewport 缩放。优先用 transform 方案，兼容性与清晰度较平衡。
+  - id: fe-css-09
+    name: CSS 变量与主题
+    priority: 65
+    activation:
+      type: keyword
+      keys: [CSS 变量, 主题, var]
+    content: 用 :root 定义变量，组件用 var 引用，切换主题只改根节点变量或类。变量能被 JS 读取与修改，适合运行时换肤；首屏要避免闪烁，可内联脚本提前设置。
+  - id: fe-css-10
+    name: 选择器优先级
+    priority: 65
+    activation:
+      type: keyword
+      keys: [选择器优先级, 权重, important]
+    content: 内联样式高于 id，id 高于类与属性与伪类，类高于元素与伪元素。important 最高但要少用。相同权重后出现的生效；继承样式优先级最低。
+  - id: fe-css-11
+    name: 动画性能
+    priority: 65
+    activation:
+      type: keyword
+      keys: [CSS 动画, transform, will-change]
+    content: 优先动画 transform 与 opacity，只触发合成不触发布局；避免动画 width、height、top、left。will-change 提前提升图层，但滥用会占用显存，动画结束应移除。
+  - id: fe-css-12
+    name: 浮动与清除
+    priority: 55
+    activation:
+      type: keyword
+      keys: [浮动, clearfix, 清除浮动]
+    content: 浮动元素脱离普通流，父容器高度塌陷。清除方式有给父级加 BFC、用 clear 的伪元素、或现代布局直接改用 Flex 与 Grid。新项目不建议用浮动做布局。
+  - id: fe-css-13
+    name: 文本溢出处理
+    priority: 55
+    activation:
+      type: keyword
+      keys: [文本溢出, ellipsis, 多行省略]
+    content: 单行省略用 overflow hidden、white-space nowrap、text-overflow ellipsis；多行用 display box 加 line-clamp 与 orient。注意 line-clamp 在部分浏览器需前缀，且会截断可访问性文本。
+  - id: fe-css-14
+    name: 伪类与伪元素
+    priority: 55
+    activation:
+      type: keyword
+      keys: [伪类, 伪元素, before after]
+    content: 伪类描述状态（hover、focus、nth-child），伪元素创建虚拟节点（before、after、placeholder）。before 与 after 必须给 content，且无法绑定事件。
+  - id: fe-css-15
+    name: 样式隔离方案
+    priority: 60
+    activation:
+      type: keyword
+      keys: [样式隔离, scoped, CSS Modules]
+    content: scoped 通过属性选择器限定作用域；CSS Modules 编译成哈希类名；Shadow DOM 提供原生隔离。微前端场景要额外处理全局样式污染与层级冲突。
+
+  # ---------------- 工程化与构建（10 条）----------------
+  - id: fe-build-01
+    name: Vite 为什么快
+    priority: 80
+    activation:
+      type: keyword
+      keys: [Vite, 开发服务器, ESM]
+    content: 开发时利用浏览器原生 ESM 按需编译，依赖用 esbuild 预构建，启动不需要打包整图；热更新基于模块图只失效相关模块。生产构建用 Rollup，esbuild 只负责压缩。
+  - id: fe-build-02
+    name: 依赖预构建
+    priority: 70
+    activation:
+      type: keyword
+      keys: [预构建, 依赖优化, CommonJS]
+    content: 预构建把 CommonJS 与多文件依赖合并成单个 ESM 文件，减少请求数并统一导出；同时缓存到 node_modules 下的缓存目录，依赖或配置变化才重新构建。
+  - id: fe-build-03
+    name: tree-shaking
+    priority: 75
+    activation:
+      type: keyword
+      keys: [tree-shaking, 副作用, 按需引入]
+    content: 基于 ESM 静态结构删除未使用代码，要求模块无副作用或在 package 中声明 sideEffects。动态属性访问、立即执行的副作用、CommonJS 会阻碍摇树。用构建分析确认效果。
+  - id: fe-build-04
+    name: 代码分割
+    priority: 75
+    activation:
+      type: keyword
+      keys: [代码分割, 懒加载, chunk]
+    content: 路由级动态 import 生成独立 chunk，首屏只加载必需部分；第三方大依赖可手动分包；注意不要把首屏关键代码拆得太碎，增加请求与瀑布。
+  - id: fe-build-05
+    name: 环境变量
+    priority: 60
+    activation:
+      type: keyword
+      keys: [环境变量, .env, 构建配置]
+    content: 构建期变量注入产物，只有带特定前缀的变量会暴露到客户端。密钥绝不能放前端环境变量。不同环境用不同配置文件，并在启动时校验必填项。
+  - id: fe-build-06
+    name: 代理与联调
+    priority: 60
+    activation:
+      type: keyword
+      keys: [代理, 联调, proxy]
+    content: 开发服务器代理把接口请求转发到后端，规避跨域；要处理路径重写、cookie 域与 WebSocket 代理。生产环境用网关或同域部署，不要带开发代理。
+  - id: fe-build-07
+    name: 包体积分析
+    priority: 65
+    activation:
+      type: keyword
+      keys: [包体积, 构建分析, 依赖]
+    content: 用分析插件看每个依赖占比与重复引入；常见问题是整包引入组件库、重复版本的依赖、未压缩的地图或字体。拆出去前先确认收益与缓存影响。
+  - id: fe-build-08
+    name: 压缩与缓存策略
+    priority: 60
+    activation:
+      type: keyword
+      keys: [gzip, brotli, 文件名哈希]
+    content: 静态资源用 gzip 或 brotli 压缩，文件名带内容哈希便于长缓存；HTML 不缓存；CDN 配置缓存规则与刷新策略。压缩级别过高会增加构建与响应耗时。
+  - id: fe-build-09
+    name: 前端灰度与回滚
+    priority: 60
+    activation:
+      type: keyword
+      keys: [前端灰度, 回滚, 发布]
+    content: 按用户或比例分发不同版本资源，用 cookie 或网关路由决定加载哪套 HTML；资源哈希让新旧版本共存；回滚只切 HTML 指向旧版本，必须保证接口兼容。
+  - id: fe-build-10
+    name: 构建缓存
+    priority: 55
+    activation:
+      type: keyword
+      keys: [构建缓存, 增量构建, CI]
+    content: CI 中缓存依赖目录与构建缓存目录能显著缩短时间；用锁文件保证依赖一致；缓存 key 要包含依赖与配置，避免拿到过期产物。
+
+  # ---------------- 性能优化（10 条）----------------
+  - id: fe-perf-01
+    name: 核心指标
+    priority: 80
+    activation:
+      type: keyword
+      keys: [LCP, CLS, INP, 性能指标]
+    content: LCP 衡量最大内容绘制，CLS 衡量布局偏移，INP 衡量交互响应。首屏优化盯 LCP 与 TTFB，交互卡顿盯 INP 与长任务，视觉稳定盯 CLS。用真实用户监控而不是只看本地。
+  - id: fe-perf-02
+    name: 重排与重绘
+    priority: 75
+    activation:
+      type: keyword
+      keys: [重排, 重绘, 布局抖动]
+    content: 几何属性变化触发重排，颜色变化触发重绘。批量改样式、读写分离避免强制同步布局、用 transform 与 opacity 走合成层、用 documentFragment 批量插入。
+  - id: fe-perf-03
+    name: 首屏优化手段
+    priority: 80
+    activation:
+      type: keyword
+      keys: [首屏优化, 骨架屏, SSR]
+    content: 减少首屏关键请求与体积，路由懒加载、接口并行或合并、图片与字体优化、CDN 与压缩、骨架屏或 SSR 改善感知。优化前后用同一网络条件对比。
+  - id: fe-perf-04
+    name: 长任务与卡顿
+    priority: 70
+    activation:
+      type: keyword
+      keys: [长任务, 卡顿, 主线程]
+    content: 超过 50ms 的任务会阻塞交互与渲染。用 Performance 面板与 longtask 观察，拆分大计算、用 Worker、让出主线程（setTimeout 或 scheduler）、减少一次性 DOM 操作。
+  - id: fe-perf-05
+    name: 虚拟列表
+    priority: 75
+    activation:
+      type: keyword
+      keys: [虚拟列表, 长列表, 渲染优化]
+    content: 只渲染可视区与缓冲区，用占位高度维持滚动条。定高实现简单，不定高需要测量与缓存高度。注意滚动事件节流与快速滚动时的白屏。
+  - id: fe-perf-06
+    name: 图片优化
+    priority: 70
+    activation:
+      type: keyword
+      keys: [图片优化, WebP, 懒加载]
+    content: 选合适格式与分辨率，用 srcset 适配，非首屏懒加载，固定宽高避免抖动，CDN 压缩与缓存。装饰图可用 CSS 或 SVG，减少请求与体积。
+  - id: fe-perf-07
+    name: 字体优化
+    priority: 60
+    activation:
+      type: keyword
+      keys: [字体优化, font-display, 子集化]
+    content: 字体子集化只保留用到的字形，用 font-display swap 避免文本不可见，预加载首屏字体，中文字体慎用整包。系统字体栈能省掉一次请求。
+  - id: fe-perf-08
+    name: 预加载与预连接
+    priority: 60
+    activation:
+      type: keyword
+      keys: [preload, prefetch, 预连接]
+    content: preload 提前加载当前页关键资源，prefetch 预取后续可能用到的资源，preconnect 与 dns-prefetch 提前建连。滥用会抢带宽，只对真正关键资源用。
+  - id: fe-perf-09
+    name: 缓存策略设计
+    priority: 65
+    activation:
+      type: keyword
+      keys: [缓存策略, 版本化, 静态资源]
+    content: 静态资源长缓存加内容哈希，接口按业务决定是否缓存，HTML 不缓存或短缓存。多级缓存（内存、Service Worker、CDN）要统一失效策略。
+  - id: fe-perf-10
+    name: 性能监控
+    priority: 65
+    activation:
+      type: keyword
+      keys: [性能监控, RUM, 埋点]
+    content: 用 PerformanceObserver 采 LCP、CLS、INP 与长任务，按页面版本与设备聚合上报；对比发版前后趋势，定位劣化版本。注意采样率与上报开销。
+
+  # ---------------- 安全（6 条）----------------
+  - id: fe-sec-01
+    name: XSS 防御
+    priority: 80
+    activation:
+      type: keyword
+      keys: [XSS, 转义, CSP]
+    content: 存储型、反射型、DOM 型三类。默认用文本插值而不是 innerHTML；富文本用白名单 sanitize；cookie 设 HttpOnly；配置 CSP 限制脚本来源；校验 URL 参数与消息来源。
+  - id: fe-sec-02
+    name: CSRF 防御
+    priority: 75
+    activation:
+      type: keyword
+      keys: [CSRF, SameSite, Token]
+    content: 攻击者借用户 cookie 发请求。SameSite 限制跨站携带 cookie，CSRF Token 校验请求来源，再配合 Origin 与 Referer 校验。写操作不用 GET，敏感操作二次确认。
+  - id: fe-sec-03
+    name: 点击劫持
+    priority: 60
+    activation:
+      type: keyword
+      keys: [点击劫持, iframe, X-Frame-Options]
+    content: 攻击者用透明 iframe 诱导点击。防御用 X-Frame-Options 或 CSP 的 frame-ancestors 禁止被嵌入；敏感操作加二次验证。
+  - id: fe-sec-04
+    name: 敏感信息存储
+    priority: 65
+    activation:
+      type: keyword
+      keys: [token 存储, 敏感信息, 安全]
+    content: 长期凭证优先放 HttpOnly cookie，避免 localStorage 被 XSS 读取；前端不存密码与身份证等敏感数据；日志与上报要脱敏。
+  - id: fe-sec-05
+    name: 依赖安全
+    priority: 60
+    activation:
+      type: keyword
+      keys: [依赖安全, 供应链, 漏洞扫描]
+    content: 锁定依赖版本，定期扫描已知漏洞，升级前看变更说明；不使用来源不明的 CDN 脚本，关键资源加完整性校验。构建产物要能追溯到依赖清单。
+  - id: fe-sec-06
+    name: postMessage 安全
+    priority: 55
+    activation:
+      type: keyword
+      keys: [postMessage, 消息校验, origin]
+    content: 接收消息时必须校验 event.origin 与数据结构，发送时明确目标 origin 而不是通配符。不要直接把消息内容当 HTML 渲染。

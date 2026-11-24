@@ -11,6 +11,9 @@ app:
   # 相对当前工作目录解析——后端 jar 与单测都在 backend/ 下启动，所以落到项目根的 ../game_data/characters；
   # CharacterCardService 里另有一条「上一级目录」兜底，两种工作目录都能命中。
   characters-dir: game_data/characters
+  # 岗位知识库（世界书）目录（issue #1）：一个岗位一个 yml，启动时扫描入库并供 /api/worldbooks 查询。
+  # 同样相对工作目录解析，WorldbookService 里另有「上一级目录」兜底。
+  worldbooks-dir: game_data/worldbooks
   llm:
     base-url: https://api.deepseek.com
     # 密钥不入库：从环境变量读，或写进 application-local.yml（已在 .gitignore 里）。
